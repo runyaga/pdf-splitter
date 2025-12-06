@@ -12,10 +12,29 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 
 ## Installation
 
+### Using uv (recommended)
+
 ```bash
-# Clone and setup virtual environment
-python -m venv .
-source bin/activate
+# Create virtual environment and install
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+```
+
+### Using pip
+
+```bash
+# Create virtual environment and install
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Legacy (requirements.txt)
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -25,28 +44,32 @@ pip install -r requirements.txt
 
 ```bash
 # Analyze a PDF's structure
-bin/pdf-splitter analyze document.pdf
+pdf-splitter analyze document.pdf
 
 # Split a PDF into chunks
-bin/pdf-splitter split document.pdf --output ./chunks
+pdf-splitter split document.pdf --output ./chunks
 
 # Compare all splitting strategies
-bin/pdf-splitter compare document.pdf
+pdf-splitter compare document.pdf
 
 # Batch analyze a directory
-bin/pdf-splitter batch ./documents/
+pdf-splitter batch ./documents/
 ```
 
 ### CLI Options
 
 ```bash
-bin/pdf-splitter --help
+pdf-splitter split --help
 
-# Global options (before command):
+# Options (available on all subcommands):
 #   --max-pages N    Maximum pages per chunk (default: 100)
 #   --min-pages N    Minimum pages per chunk (default: 15)
 #   --overlap N      Overlap pages between chunks (default: 5)
 #   -v, --verbose    Verbose output
+
+# Split-specific options:
+#   -o, --output     Output directory
+#   -s, --strategy   Force strategy: fixed, hybrid, enhanced
 ```
 
 ### Python API
@@ -84,23 +107,21 @@ The `smart_split()` function automatically selects the best strategy.
 ## Running Tests
 
 ```bash
-source bin/activate
-
 # Run all unit tests
-python -m pytest tests/ -v --ignore=tests/test_integration.py
+pytest tests/ -v --ignore=tests/test_integration.py
 
 # Run integration tests (requires PDFs in assets/)
-python -m pytest tests/test_integration.py -v -m integration
+pytest tests/ -v -m integration
 
 # Run all tests
-python -m pytest tests/ -v
+pytest tests/ -v
 ```
 
 ## Project Structure
 
 ```
 pdf-splitter/
-├── bin/pdf-splitter           # CLI entry point
+├── pyproject.toml             # Project configuration
 ├── src/
 │   ├── cli.py                 # CLI implementation
 │   ├── segmentation.py        # Basic splitting
@@ -109,8 +130,7 @@ pdf-splitter/
 │   ├── processor.py           # Parallel batch processing
 │   └── reassembly.py          # Document merging
 ├── tests/                     # Test suite
-├── assets/                    # Place PDFs here
-└── requirements.txt
+└── assets/                    # Place PDFs here
 ```
 
 ## Requirements
