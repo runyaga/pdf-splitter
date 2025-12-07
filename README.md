@@ -75,6 +75,15 @@ merged_doc = merge_from_results(results)  # Returns unified DoclingDocument
 merged_doc.export_to_json("output.json")
 ```
 
+## Visualization
+
+After merging, use [docling-view](https://github.com/runyaga/docling-view) to generate an HTML visualization of your Docling document with extracted images and bounding box overlays:
+
+```bash
+pip install docling-view
+docling-view output.json -o output.html
+```
+
 ## Strategies
 
 | Strategy | Use Case |
