@@ -9,14 +9,15 @@ Provides smarter PDF splitting with:
 5. Unified smart_split() that auto-selects the best strategy
 """
 
-from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
-from pypdf import PdfReader, PdfWriter
-from dataclasses import dataclass
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import tempfile
 import logging
 import os
+import tempfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from pypdf import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ MIN_CHUNKS_FOR_LARGE_DOC = 5  # Minimum chunks for docs > 200 pages
 @dataclass
 class SplitResult:
     """Result of smart_split() operation."""
-    boundaries: List[Tuple[int, int]]
+
+    boundaries: list[tuple[int, int]]
     strategy: str
     total_pages: int
     num_chunks: int
@@ -55,7 +57,7 @@ def smart_split(
     max_chunk_pages: int = 100,
     min_chunk_pages: int = 15,
     overlap: int = DEFAULT_OVERLAP,
-    force_strategy: Optional[str] = None,
+    force_strategy: str | None = None,
 ) -> SplitResult:
     """
     Unified smart splitting that auto-selects the best strategy.
@@ -101,21 +103,21 @@ def smart_split(
             min_chunk_size=0,
             max_chunk_size=0,
             avg_chunk_size=0,
-            has_overlap=False
+            has_overlap=False,
         )
 
-    logger.debug(f"Selecting strategy for {total_pages} pages (max={max_chunk_pages}, min={min_chunk_pages})")
+    logger.debug(
+        f"Selecting strategy for {total_pages} pages (max={max_chunk_pages}, min={min_chunk_pages})"
+    )
 
     # Select strategy
     if force_strategy:
         boundaries, strategy = _apply_forced_strategy(
-            pdf_path, total_pages, force_strategy,
-            max_chunk_pages, min_chunk_pages, overlap
+            pdf_path, total_pages, force_strategy, max_chunk_pages, min_chunk_pages, overlap
         )
     else:
         boundaries, strategy = _auto_select_strategy(
-            pdf_path, reader, total_pages,
-            max_chunk_pages, min_chunk_pages, overlap
+            pdf_path, reader, total_pages, max_chunk_pages, min_chunk_pages, overlap
         )
 
     # Calculate statistics
@@ -130,7 +132,7 @@ def smart_split(
         min_chunk_size=min(sizes) if sizes else 0,
         max_chunk_size=max(sizes) if sizes else 0,
         avg_chunk_size=sum(sizes) / len(sizes) if sizes else 0,
-        has_overlap=has_overlap
+        has_overlap=has_overlap,
     )
 
 
@@ -140,8 +142,8 @@ def _apply_forced_strategy(
     strategy: str,
     max_chunk_pages: int,
     min_chunk_pages: int,
-    overlap: int
-) -> Tuple[List[Tuple[int, int]], str]:
+    overlap: int,
+) -> tuple[list[tuple[int, int]], str]:
     """Apply a specific forced strategy."""
     logger.info(f"Forcing strategy: {strategy}")
     if strategy == "fixed":
@@ -160,13 +162,15 @@ def _auto_select_strategy(
     total_pages: int,
     max_chunk_pages: int,
     min_chunk_pages: int,
-    overlap: int
-) -> Tuple[List[Tuple[int, int]], str]:
+    overlap: int,
+) -> tuple[list[tuple[int, int]], str]:
     """Auto-select the best strategy based on document characteristics."""
 
     # Small documents: use fixed splitting
     if total_pages <= max_chunk_pages:
-        logger.debug(f"Small document ({total_pages} pages <= {max_chunk_pages}), using single chunk")
+        logger.debug(
+            f"Small document ({total_pages} pages <= {max_chunk_pages}), using single chunk"
+        )
         return [(0, total_pages)], "single_chunk"
 
     if total_pages <= max_chunk_pages * 2:
@@ -189,8 +193,7 @@ def _auto_select_strategy(
 
     # Check for chapter-level structure
     has_chapters = any(
-        'CHAPTER' in title.upper() or 'PART' in title.upper()
-        for _, _, title in all_bookmarks
+        "CHAPTER" in title.upper() or "PART" in title.upper() for _, _, title in all_bookmarks
     )
     logger.debug(f"Chapter-level structure detected: {has_chapters}")
 
@@ -203,7 +206,7 @@ def _auto_select_strategy(
         if _is_balanced(boundaries, total_pages, MAX_CHUNK_RATIO):
             logger.info(f"Selected hybrid strategy: {strategy} ({len(boundaries)} chunks)")
             return boundaries, f"auto_{strategy}"
-        logger.debug(f"Hybrid strategy unbalanced, trying enhanced")
+        logger.debug("Hybrid strategy unbalanced, trying enhanced")
 
     # Try enhanced strategy
     logger.debug("Trying enhanced bookmark strategy")
@@ -216,26 +219,20 @@ def _auto_select_strategy(
         return boundaries, f"auto_{strategy}"
 
     # Final fallback: fixed splitting
-    logger.info(f"Falling back to fixed splitting ({total_pages} pages, chunk_size={max_chunk_pages})")
+    logger.info(
+        f"Falling back to fixed splitting ({total_pages} pages, chunk_size={max_chunk_pages})"
+    )
     return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_fallback"
 
 
-def _check_overlap(boundaries: List[Tuple[int, int]]) -> bool:
+def _check_overlap(boundaries: list[tuple[int, int]]) -> bool:
     """Check if boundaries have overlapping regions."""
-    for i in range(len(boundaries) - 1):
-        if boundaries[i][1] > boundaries[i + 1][0]:
-            return True
-    return False
+    return any(boundaries[i][1] > boundaries[i + 1][0] for i in range(len(boundaries) - 1))
 
 
 def _write_single_chunk(
-    reader_path: str,
-    start: int,
-    end: int,
-    idx: int,
-    total_chunks: int,
-    output_dir_str: str
-) -> Tuple[int, Optional[str], Optional[str]]:
+    reader_path: str, start: int, end: int, idx: int, total_chunks: int, output_dir_str: str
+) -> tuple[int, str | None, str | None]:
     """
     Write a single chunk to disk. Designed for parallel execution.
 
@@ -253,6 +250,7 @@ def _write_single_chunk(
     # Disable GC in worker to prevent GC thrashing on large PDFs.
     # The process exits after this function returns anyway.
     import gc
+
     gc.disable()
 
     try:
@@ -267,7 +265,7 @@ def _write_single_chunk(
                 del page["/Annots"]
             writer.add_page(page)
 
-        chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
+        chunk_filename = f"chunk_{idx:04d}_pages_{start + 1:04d}_{end:04d}.pdf"
         chunk_path = Path(output_dir_str) / chunk_filename
 
         with open(chunk_path, "wb") as f:
@@ -282,14 +280,14 @@ def _write_single_chunk(
 
 def smart_split_to_files(
     pdf_path: Path,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     max_chunk_pages: int = 100,
     min_chunk_pages: int = 15,
     overlap: int = DEFAULT_OVERLAP,
-    force_strategy: Optional[str] = None,
-    max_workers: Optional[int] = None,
+    force_strategy: str | None = None,
+    max_workers: int | None = None,
     parallel: bool = True,
-) -> Tuple[List[Path], SplitResult]:
+) -> tuple[list[Path], SplitResult]:
     """
     Split a PDF into chunk files using smart strategy selection.
 
@@ -310,9 +308,7 @@ def smart_split_to_files(
     logger.debug(f"Starting smart split: {pdf_path.name}")
 
     # Get split boundaries
-    result = smart_split(
-        pdf_path, max_chunk_pages, min_chunk_pages, overlap, force_strategy
-    )
+    result = smart_split(pdf_path, max_chunk_pages, min_chunk_pages, overlap, force_strategy)
 
     if not result.boundaries:
         logger.info("No boundaries generated (empty document)")
@@ -349,11 +345,11 @@ def smart_split_to_files(
 
 def _write_chunks_parallel(
     pdf_path: Path,
-    boundaries: List[Tuple[int, int]],
+    boundaries: list[tuple[int, int]],
     output_dir: Path,
     max_workers: int,
-    total_chunks: int
-) -> List[Path]:
+    total_chunks: int,
+) -> list[Path]:
     """Write chunks in parallel using ProcessPoolExecutor.
 
     Uses processes instead of threads because pypdf is pure Python and
@@ -374,15 +370,9 @@ def _write_chunks_parallel(
         # Submit all chunk writes
         futures = {}
         for idx, (start, end) in enumerate(boundaries):
-            logger.debug(f"[BEGIN] Submitting chunk {idx+1}/{total_chunks} to write pool")
+            logger.debug(f"[BEGIN] Submitting chunk {idx + 1}/{total_chunks} to write pool")
             future = executor.submit(
-                _write_single_chunk,
-                pdf_path_str,
-                start,
-                end,
-                idx,
-                total_chunks,
-                output_dir_str
+                _write_single_chunk, pdf_path_str, start, end, idx, total_chunks, output_dir_str
             )
             futures[future] = idx
 
@@ -394,7 +384,7 @@ def _write_chunks_parallel(
             completed_count += 1
 
             if error:
-                logger.error(f"Failed to write chunk {idx+1}: {error}")
+                logger.error(f"Failed to write chunk {idx + 1}: {error}")
             else:
                 chunk_path = Path(chunk_path_str)
                 chunk_paths[idx] = chunk_path
@@ -417,11 +407,8 @@ def _write_chunks_parallel(
 
 
 def _write_chunks_sequential(
-    pdf_path: Path,
-    boundaries: List[Tuple[int, int]],
-    output_dir: Path,
-    total_chunks: int
-) -> List[Path]:
+    pdf_path: Path, boundaries: list[tuple[int, int]], output_dir: Path, total_chunks: int
+) -> list[Path]:
     """Write chunks sequentially (original behavior)."""
     logger.debug(f"Sequential chunk writing: {total_chunks} chunks")
 
@@ -441,16 +428,18 @@ def _write_chunks_sequential(
                 del page["/Annots"]
             writer.add_page(page)
 
-        chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
+        chunk_filename = f"chunk_{idx:04d}_pages_{start + 1:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
 
-        logger.debug(f"[BEGIN] Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
+        logger.debug(
+            f"[BEGIN] Writing chunk {idx + 1}/{total_chunks}: pages {start + 1}-{end} ({num_pages} pages)"
+        )
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
         chunk_paths.append(chunk_path)
-        logger.debug(f"[COMPLETE] Chunk {idx+1}/{total_chunks}: {chunk_filename}")
-        logger.debug(f"Wrote chunk {idx+1}/{total_chunks}: {chunk_filename}")
+        logger.debug(f"[COMPLETE] Chunk {idx + 1}/{total_chunks}: {chunk_filename}")
+        logger.debug(f"Wrote chunk {idx + 1}/{total_chunks}: {chunk_filename}")
 
     return chunk_paths
 
@@ -459,9 +448,9 @@ def get_split_boundaries_enhanced(
     pdf_path: Path,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     overlap: int = DEFAULT_OVERLAP,
-    target_level: Optional[int] = None,
+    target_level: int | None = None,
     max_chunk_ratio: float = MAX_CHUNK_RATIO,
-) -> Tuple[List[Tuple[int, int]], str]:
+) -> tuple[list[tuple[int, int]], str]:
     """
     Enhanced split boundary detection with multiple strategies.
 
@@ -489,16 +478,16 @@ def get_split_boundaries_enhanced(
     # Try deep bookmark extraction
     if reader.outline:
         logger.debug("Document has outline, attempting deep bookmark extraction")
-        boundaries, level_used = _get_deep_bookmark_boundaries(
-            reader, total_pages, target_level
-        )
+        boundaries, level_used = _get_deep_bookmark_boundaries(reader, total_pages, target_level)
 
         if boundaries and _is_balanced(boundaries, total_pages, max_chunk_ratio):
             logger.info(f"Using bookmark level {level_used}: {len(boundaries)} balanced chunks")
             return boundaries, f"bookmark_level_{level_used}"
 
         if boundaries:
-            logger.debug(f"Bookmark boundaries unbalanced ({len(boundaries)} chunks), trying rebalancing")
+            logger.debug(
+                f"Bookmark boundaries unbalanced ({len(boundaries)} chunks), trying rebalancing"
+            )
             # Try rebalancing large chunks
             rebalanced = _rebalance_chunks(boundaries, total_pages, chunk_size, overlap)
             if rebalanced and _is_balanced(rebalanced, total_pages, max_chunk_ratio):
@@ -515,10 +504,8 @@ def get_split_boundaries_enhanced(
 
 
 def _get_deep_bookmark_boundaries(
-    reader: PdfReader,
-    total_pages: int,
-    target_level: Optional[int] = None
-) -> Tuple[List[Tuple[int, int]], int]:
+    reader: PdfReader, total_pages: int, target_level: int | None = None
+) -> tuple[list[tuple[int, int]], int]:
     """
     Extract boundaries by traversing bookmark tree deeply.
 
@@ -534,13 +521,15 @@ def _get_deep_bookmark_boundaries(
         return [], -1
 
     # Group by level
-    by_level: Dict[int, List[int]] = {}
-    for page, level, title in all_bookmarks:
+    by_level: dict[int, list[int]] = {}
+    for page, level, _title in all_bookmarks:
         if level not in by_level:
             by_level[level] = []
         by_level[level].append(page)
 
-    logger.debug(f"Bookmark levels found: {sorted(by_level.keys())} with counts {[len(by_level[k]) for k in sorted(by_level.keys())]}")
+    logger.debug(
+        f"Bookmark levels found: {sorted(by_level.keys())} with counts {[len(by_level[k]) for k in sorted(by_level.keys())]}"
+    )
 
     # Find the best level
     if target_level is not None and target_level in by_level:
@@ -574,10 +563,7 @@ def _get_deep_bookmark_boundaries(
 
 
 def _collect_bookmarks_recursive(
-    reader: PdfReader,
-    outline: list,
-    results: List[Tuple[int, int, str]],
-    level: int
+    reader: PdfReader, outline: list, results: list[tuple[int, int, str]], level: int
 ):
     """Recursively collect all bookmarks with their depth level."""
     for item in outline:
@@ -587,10 +573,10 @@ def _collect_bookmarks_recursive(
         else:
             try:
                 page_num = reader.get_destination_page_number(item)
-                title = item.title if hasattr(item, 'title') else str(item)
+                title = item.title if hasattr(item, "title") else str(item)
 
                 # Skip file-like titles (common in scanned/compiled PDFs)
-                if title.endswith('.pdf') or 'Binder' in title:
+                if title.endswith(".pdf") or "Binder" in title:
                     continue
 
                 if page_num is not None:
@@ -599,10 +585,7 @@ def _collect_bookmarks_recursive(
                 continue
 
 
-def _find_optimal_level(
-    by_level: Dict[int, List[int]],
-    total_pages: int
-) -> int:
+def _find_optimal_level(by_level: dict[int, list[int]], total_pages: int) -> int:
     """
     Find the bookmark level that provides the best split points.
 
@@ -626,8 +609,7 @@ def _find_optimal_level(
 
         # Calculate distribution score
         if num_points > 1:
-            gaps = [unique_pages[i+1] - unique_pages[i]
-                    for i in range(len(unique_pages)-1)]
+            gaps = [unique_pages[i + 1] - unique_pages[i] for i in range(len(unique_pages) - 1)]
             avg_gap = sum(gaps) / len(gaps)
             max_gap = max(gaps)
 
@@ -646,11 +628,7 @@ def _find_optimal_level(
     return best_level
 
 
-def _is_balanced(
-    boundaries: List[Tuple[int, int]],
-    total_pages: int,
-    max_ratio: float
-) -> bool:
+def _is_balanced(boundaries: list[tuple[int, int]], total_pages: int, max_ratio: float) -> bool:
     """Check if chunk distribution is reasonably balanced."""
     if not boundaries:
         return False
@@ -660,24 +638,17 @@ def _is_balanced(
         ratio = chunk_size / total_pages
         if ratio > max_ratio:
             logger.debug(
-                f"Chunk pages {start}-{end} ({chunk_size} pages) "
-                f"exceeds max ratio {max_ratio:.0%}"
+                f"Chunk pages {start}-{end} ({chunk_size} pages) exceeds max ratio {max_ratio:.0%}"
             )
             return False
 
     # For large documents, ensure minimum number of chunks
-    if total_pages > 200 and len(boundaries) < MIN_CHUNKS_FOR_LARGE_DOC:
-        return False
-
-    return True
+    return not (total_pages > 200 and len(boundaries) < MIN_CHUNKS_FOR_LARGE_DOC)
 
 
 def _rebalance_chunks(
-    boundaries: List[Tuple[int, int]],
-    total_pages: int,
-    chunk_size: int,
-    overlap: int
-) -> List[Tuple[int, int]]:
+    boundaries: list[tuple[int, int]], total_pages: int, chunk_size: int, overlap: int
+) -> list[tuple[int, int]]:
     """
     Rebalance chunks by splitting large ones with fixed-size strategy.
     """
@@ -690,9 +661,7 @@ def _rebalance_chunks(
 
         # If chunk is too large, split it further
         if chunk_pages > chunk_size * 2:
-            sub_boundaries = _get_fixed_boundaries(
-                chunk_pages, chunk_size, overlap
-            )
+            sub_boundaries = _get_fixed_boundaries(chunk_pages, chunk_size, overlap)
             # Offset to actual page positions
             for sub_start, sub_end in sub_boundaries:
                 result.append((start + sub_start, start + sub_end))
@@ -702,11 +671,7 @@ def _rebalance_chunks(
     return result
 
 
-def _get_fixed_boundaries(
-    total_pages: int,
-    chunk_size: int,
-    overlap: int
-) -> List[Tuple[int, int]]:
+def _get_fixed_boundaries(total_pages: int, chunk_size: int, overlap: int) -> list[tuple[int, int]]:
     """Generate fixed-size chunk boundaries with overlap."""
     # Validate inputs
     if chunk_size < 1:
@@ -732,7 +697,7 @@ def _get_fixed_boundaries(
     return boundaries
 
 
-def analyze_document_structure(pdf_path: Path) -> Dict[str, Any]:
+def analyze_document_structure(pdf_path: Path) -> dict[str, Any]:
     """
     Analyze a PDF's structure for splitting decisions.
 
@@ -743,16 +708,16 @@ def analyze_document_structure(pdf_path: Path) -> Dict[str, Any]:
     total_pages = len(reader.pages)
 
     analysis = {
-        'filename': pdf_path.name,
-        'total_pages': total_pages,
-        'has_outline': bool(reader.outline),
-        'bookmark_levels': {},
-        'recommended_strategy': None,
-        'recommended_level': None,
+        "filename": pdf_path.name,
+        "total_pages": total_pages,
+        "has_outline": bool(reader.outline),
+        "bookmark_levels": {},
+        "recommended_strategy": None,
+        "recommended_level": None,
     }
 
     if not reader.outline:
-        analysis['recommended_strategy'] = 'fixed'
+        analysis["recommended_strategy"] = "fixed"
         return analysis
 
     # Collect all bookmarks
@@ -760,7 +725,7 @@ def analyze_document_structure(pdf_path: Path) -> Dict[str, Any]:
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
 
     # Analyze by level
-    by_level: Dict[int, List[Tuple[int, str]]] = {}
+    by_level: dict[int, list[tuple[int, str]]] = {}
     for page, level, title in all_bookmarks:
         if level not in by_level:
             by_level[level] = []
@@ -770,23 +735,22 @@ def analyze_document_structure(pdf_path: Path) -> Dict[str, Any]:
         pages = [p for p, t in items]
         titles = [t for p, t in items][:5]  # Sample titles
 
-        analysis['bookmark_levels'][level] = {
-            'count': len(items),
-            'unique_pages': len(set(pages)),
-            'sample_titles': titles,
+        analysis["bookmark_levels"][level] = {
+            "count": len(items),
+            "unique_pages": len(set(pages)),
+            "sample_titles": titles,
         }
 
     # Determine best level and strategy
     best_level = _find_optimal_level(
-        {k: [p for p, t in v] for k, v in by_level.items()},
-        total_pages
+        {k: [p for p, t in v] for k, v in by_level.items()}, total_pages
     )
 
     if best_level >= 0:
-        analysis['recommended_level'] = best_level
-        analysis['recommended_strategy'] = f'bookmark_level_{best_level}'
+        analysis["recommended_level"] = best_level
+        analysis["recommended_strategy"] = f"bookmark_level_{best_level}"
     else:
-        analysis['recommended_strategy'] = 'fixed'
+        analysis["recommended_strategy"] = "fixed"
 
     return analysis
 
@@ -796,7 +760,7 @@ def get_split_boundaries_hybrid(
     max_chunk_pages: int = 100,
     min_chunk_pages: int = 10,
     overlap: int = DEFAULT_OVERLAP,
-) -> Tuple[List[Tuple[int, int]], str]:
+) -> tuple[list[tuple[int, int]], str]:
     """
     Hybrid approach: Use chapter boundaries and subdivide large chapters.
 
@@ -834,7 +798,7 @@ def get_split_boundaries_hybrid(
     logger.debug(f"Collected {len(all_bookmarks)} bookmarks for hybrid analysis")
 
     # Group by level
-    by_level: Dict[int, List[Tuple[int, str]]] = {}
+    by_level: dict[int, list[tuple[int, str]]] = {}
     for page, level, title in all_bookmarks:
         if level not in by_level:
             by_level[level] = []
@@ -844,7 +808,7 @@ def get_split_boundaries_hybrid(
     chapter_level = None
     for level, items in sorted(by_level.items()):
         titles = [t for p, t in items]
-        if any('CHAPTER' in t.upper() or 'PART' in t.upper() for t in titles):
+        if any("CHAPTER" in t.upper() or "PART" in t.upper() for t in titles):
             chapter_level = level
             logger.debug(f"Found chapter-level bookmarks at level {level} ({len(items)} items)")
             break
@@ -855,16 +819,16 @@ def get_split_boundaries_hybrid(
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed"
 
     # Get chapter boundaries
-    chapter_pages = sorted(set(p for p, t in by_level[chapter_level]))
+    chapter_pages = sorted({p for p, _t in by_level[chapter_level]})
     if chapter_pages[0] != 0:
         chapter_pages.insert(0, 0)
     logger.debug(f"Chapter boundaries at pages: {chapter_pages}")
 
     # Get section boundaries (one level deeper)
     section_level = chapter_level + 1
-    section_pages = set()
+    section_pages: set[int] = set()
     if section_level in by_level:
-        section_pages = set(p for p, t in by_level[section_level])
+        section_pages = {p for p, _t in by_level[section_level]}
         logger.debug(f"Found {len(section_pages)} section boundaries at level {section_level}")
 
     # Build final boundaries
@@ -878,19 +842,22 @@ def get_split_boundaries_hybrid(
 
         if chap_size <= max_chunk_pages:
             # Chapter fits in one chunk
-            logger.debug(f"Chapter {i+1}: pages {chap_start+1}-{chap_end} ({chap_size} pages) - single chunk")
+            logger.debug(
+                f"Chapter {i + 1}: pages {chap_start + 1}-{chap_end} ({chap_size} pages) - single chunk"
+            )
             final_boundaries.append((chap_start, chap_end))
         else:
             # Subdivide large chapter
-            logger.debug(f"Chapter {i+1}: pages {chap_start+1}-{chap_end} ({chap_size} pages) - needs subdivision")
+            logger.debug(
+                f"Chapter {i + 1}: pages {chap_start + 1}-{chap_end} ({chap_size} pages) - needs subdivision"
+            )
             # First try using section boundaries
-            relevant_sections = sorted([p for p in section_pages
-                                       if chap_start < p < chap_end])
+            relevant_sections = sorted([p for p in section_pages if chap_start < p < chap_end])
 
             if relevant_sections:
                 # Use section boundaries
                 logger.debug(f"  Using {len(relevant_sections)} section boundaries")
-                section_points = [chap_start] + relevant_sections + [chap_end]
+                section_points = [chap_start, *relevant_sections, chap_end]
                 sub_boundaries = []
 
                 for j in range(len(section_points) - 1):
@@ -903,14 +870,14 @@ def get_split_boundaries_hybrid(
                     sub_boundaries, max_chunk_pages, min_chunk_pages, overlap
                 )
                 final_boundaries.extend(merged)
-                strategy_parts.append(f"ch{i+1}:sections")
+                strategy_parts.append(f"ch{i + 1}:sections")
             else:
                 # Fixed split for this chapter
-                logger.debug(f"  No sections found, using fixed split")
+                logger.debug("  No sections found, using fixed split")
                 sub = _get_fixed_boundaries(chap_size, max_chunk_pages, overlap)
                 for s, e in sub:
                     final_boundaries.append((chap_start + s, chap_start + e))
-                strategy_parts.append(f"ch{i+1}:fixed")
+                strategy_parts.append(f"ch{i + 1}:fixed")
 
     # Final merge pass for tiny chunks
     pre_merge_count = len(final_boundaries)
@@ -927,11 +894,8 @@ def get_split_boundaries_hybrid(
 
 
 def _merge_and_split_boundaries(
-    boundaries: List[Tuple[int, int]],
-    max_pages: int,
-    min_pages: int,
-    overlap: int
-) -> List[Tuple[int, int]]:
+    boundaries: list[tuple[int, int]], max_pages: int, min_pages: int, overlap: int
+) -> list[tuple[int, int]]:
     """Merge small boundaries and split large ones."""
     result = []
     accumulated_start = None
@@ -976,10 +940,7 @@ def _merge_and_split_boundaries(
     return result
 
 
-def _merge_tiny_chunks(
-    boundaries: List[Tuple[int, int]],
-    min_pages: int
-) -> List[Tuple[int, int]]:
+def _merge_tiny_chunks(boundaries: list[tuple[int, int]], min_pages: int) -> list[tuple[int, int]]:
     """Merge chunks smaller than min_pages with neighbors."""
     if len(boundaries) <= 1:
         return boundaries
@@ -1006,10 +967,10 @@ def _merge_tiny_chunks(
 
 def get_split_boundaries_with_docling_toc(
     pdf_path: Path,
-    toc_page_range: Tuple[int, int] = (0, 50),
+    toc_page_range: tuple[int, int] = (0, 50),
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     overlap: int = DEFAULT_OVERLAP,
-) -> Tuple[List[Tuple[int, int]], str]:
+) -> tuple[list[tuple[int, int]], str]:
     """
     Use Docling to extract TOC from first pages for split boundaries.
 
@@ -1024,10 +985,12 @@ def get_split_boundaries_with_docling_toc(
     Returns:
         Tuple of (boundaries, strategy_used)
     """
-    from src.config_factory import create_converter
-    from pypdf import PdfReader, PdfWriter
-    import tempfile
     import re
+    import tempfile
+
+    from pypdf import PdfReader, PdfWriter
+
+    from src.config_factory import create_converter
 
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)
@@ -1036,7 +999,7 @@ def get_split_boundaries_with_docling_toc(
     toc_start, toc_end = toc_page_range
     toc_end = min(toc_end, total_pages)
 
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         writer = PdfWriter()
         for i in range(toc_start, toc_end):
             writer.add_page(reader.pages[i])
@@ -1055,12 +1018,12 @@ def get_split_boundaries_with_docling_toc(
 
         # Pattern: "Chapter/Section Name ... page_number" or similar
         patterns = [
-            r'(?:CHAPTER|Chapter|PART|Part|SECTION|Section)\s+(\d+)[^\d]*?(\d{1,4})\s*$',
-            r'^([A-Z][A-Z\s]+)\s+\.+\s*(\d{1,4})\s*$',  # "TITLE .... 123"
-            r'^(\d+(?:\.\d+)*)\s+([^\.]+)\s+\.+\s*(\d{1,4})\s*$',  # "1.2 Title ... 45"
+            r"(?:CHAPTER|Chapter|PART|Part|SECTION|Section)\s+(\d+)[^\d]*?(\d{1,4})\s*$",
+            r"^([A-Z][A-Z\s]+)\s+\.+\s*(\d{1,4})\s*$",  # "TITLE .... 123"
+            r"^(\d+(?:\.\d+)*)\s+([^\.]+)\s+\.+\s*(\d{1,4})\s*$",  # "1.2 Title ... 45"
         ]
 
-        for line in text_content.split('\n'):
+        for line in text_content.split("\n"):
             line = line.strip()
             for pattern in patterns:
                 match = re.search(pattern, line, re.MULTILINE)

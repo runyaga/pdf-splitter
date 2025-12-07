@@ -5,10 +5,10 @@ Tests parallel execution configuration and worker isolation
 using maxtasksperchild=1 for memory leak prevention.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 import tempfile
+from pathlib import Path
+
+import pytest
 
 
 class TestBatchProcessor:
@@ -16,8 +16,9 @@ class TestBatchProcessor:
 
     def test_init_default_workers(self):
         """Test default worker count uses 80% of CPU count."""
-        from src.processor import BatchProcessor
         import os
+
+        from src.processor import BatchProcessor
 
         processor = BatchProcessor()
         expected_workers = max(1, int((os.cpu_count() or 4) * 0.8))
@@ -77,13 +78,14 @@ class TestWorkerFunction:
     def test_process_chunk_imports_inside_function(self):
         """Verify that imports happen inside worker (inspection test)."""
         import inspect
+
         from src.processor import _process_chunk
 
         source = inspect.getsource(_process_chunk)
 
         # Check that imports are inside the function
-        assert 'from docling.document_converter import DocumentConverter' in source
-        assert 'from docling.backend.docling_parse_v2_backend' in source
+        assert "from docling.document_converter import DocumentConverter" in source
+        assert "from docling.backend.docling_parse_v2_backend" in source
 
     # TODO: Can't patch imports inside worker function - they're imported at runtime
     # def test_process_chunk_returns_correct_structure(self):
@@ -120,7 +122,7 @@ class TestProcessorIntegration:
         """Create a simple test PDF chunk."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             writer.add_blank_page(width=612, height=792)
             writer.write(f)
@@ -141,10 +143,10 @@ class TestProcessorIntegration:
 
         assert len(results) == 1
         # Result should have expected keys
-        assert 'success' in results[0]
-        assert 'chunk_path' in results[0]
-        assert 'document_dict' in results[0]
-        assert 'error' in results[0]
+        assert "success" in results[0]
+        assert "chunk_path" in results[0]
+        assert "document_dict" in results[0]
+        assert "error" in results[0]
 
     @pytest.mark.integration
     def test_execute_parallel_processes_chunks(self, sample_pdf_chunk):
@@ -155,4 +157,4 @@ class TestProcessorIntegration:
         results = processor.execute_parallel([sample_pdf_chunk])
 
         assert len(results) == 1
-        assert 'success' in results[0]
+        assert "success" in results[0]

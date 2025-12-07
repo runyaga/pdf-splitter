@@ -10,11 +10,10 @@ These tests verify end-to-end functionality including:
 Mark with @pytest.mark.integration for selective running.
 """
 
-import pytest
-from pathlib import Path
 import tempfile
-import os
+from pathlib import Path
 
+import pytest
 
 # Skip all integration tests if docling is not installed
 pytest.importorskip("docling")
@@ -40,7 +39,7 @@ def sample_pdf(assets_dir):
     # Create a test PDF if none exists
     from pypdf import PdfWriter
 
-    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
         writer = PdfWriter()
         for _ in range(20):  # 20 pages
             writer.add_blank_page(width=612, height=792)
@@ -62,8 +61,8 @@ class TestMemoryLeakRegression:
 
         Success Condition: RAM usage remains below 2GB throughout processing.
         """
-        from src.segmentation import split_pdf
         from src.processor import BatchProcessor
+        from src.segmentation import split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Split into small chunks
@@ -78,7 +77,7 @@ class TestMemoryLeakRegression:
 
             # Basic validation - check results returned
             assert len(results) > 0
-            success_count = sum(1 for r in results if r.get('success'))
+            success_count = sum(1 for r in results if r.get("success"))
             assert success_count > 0, "At least one chunk should process successfully"
 
 
@@ -96,8 +95,9 @@ class TestSemanticContinuity:
 
         Checks that overlapping pages exist between consecutive chunks.
         """
-        from src.segmentation import get_split_boundaries, get_page_coverage
         from pypdf import PdfReader
+
+        from src.segmentation import get_page_coverage, get_split_boundaries
 
         reader = PdfReader(str(sample_pdf))
         total_pages = len(reader.pages)
@@ -108,8 +108,7 @@ class TestSemanticContinuity:
         boundaries = get_split_boundaries(sample_pdf, chunk_size=10, overlap=2)
 
         # Verify page coverage
-        assert get_page_coverage(boundaries, total_pages), \
-            "All pages should be covered"
+        assert get_page_coverage(boundaries, total_pages), "All pages should be covered"
 
         # Check for overlaps between consecutive chunks
         if len(boundaries) > 1:
@@ -118,8 +117,9 @@ class TestSemanticContinuity:
                 next_start = boundaries[i + 1][0]
 
                 # With overlap, next chunk should start before current ends
-                assert next_start < current_end or next_start == current_end, \
-                    f"Chunks {i} and {i+1} should have overlap or be contiguous"
+                assert next_start < current_end or next_start == current_end, (
+                    f"Chunks {i} and {i + 1} should have overlap or be contiguous"
+                )
 
 
 @pytest.mark.integration
@@ -147,10 +147,10 @@ class TestTableStructureIntegrity:
             table_count = 0
             for item, _level in doc.iterate_items():
                 item_type = type(item).__name__
-                if 'Table' in item_type:
+                if "Table" in item_type:
                     table_count += 1
                     # If table has export method, test it
-                    if hasattr(item, 'export_to_dataframe'):
+                    if hasattr(item, "export_to_dataframe"):
                         df = item.export_to_dataframe()
                         assert df is not None, "DataFrame export should not be None"
 
@@ -169,7 +169,9 @@ class TestProvenanceMonotonicity:
     Context: The concatenate() method must update page numbers correctly.
     """
 
-    @pytest.mark.skip(reason="docling-core 2.54.0 bug: concatenate() fails with 'tuple object has no attribute pages'")
+    @pytest.mark.skip(
+        reason="docling-core 2.54.0 bug: concatenate() fails with 'tuple object has no attribute pages'"
+    )
     def test_provenance_page_numbers_increase(self, sample_pdf):
         """
         Verify page numbers in provenance data are monotonically increasing.
@@ -177,9 +179,9 @@ class TestProvenanceMonotonicity:
         Success Condition: Page number sequence never resets (no 1,2,1,2 pattern).
         Fail Condition: Sequence resets indicate concatenation failure.
         """
-        from src.segmentation import split_pdf
         from src.processor import BatchProcessor
         from src.reassembly import merge_from_results, validate_provenance_monotonicity
+        from src.segmentation import split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunks = split_pdf(sample_pdf, Path(tmpdir), chunk_size=10, overlap=2)
@@ -191,7 +193,7 @@ class TestProvenanceMonotonicity:
             results = processor.execute_parallel(chunks[:3])  # Limit for speed
 
             # Check if we have successful results to merge
-            success_results = [r for r in results if r.get('success')]
+            success_results = [r for r in results if r.get("success")]
             if len(success_results) < 2:
                 pytest.skip("Need at least 2 successful chunks for merge test")
 
@@ -202,15 +204,16 @@ class TestProvenanceMonotonicity:
 
             # Validate provenance monotonicity
             is_monotonic = validate_provenance_monotonicity(merged_doc)
-            assert is_monotonic, \
-                "Page numbers in provenance should be monotonically increasing"
+            assert is_monotonic, "Page numbers in provenance should be monotonically increasing"
 
 
 @pytest.mark.integration
 class TestEndToEndPipeline:
     """End-to-end integration test for the complete pipeline."""
 
-    @pytest.mark.skip(reason="docling-core 2.54.0 bug: concatenate() fails with 'tuple object has no attribute pages'")
+    @pytest.mark.skip(
+        reason="docling-core 2.54.0 bug: concatenate() fails with 'tuple object has no attribute pages'"
+    )
     def test_full_pipeline(self, sample_pdf):
         """
         Test the complete split-process-merge pipeline.
@@ -220,10 +223,11 @@ class TestEndToEndPipeline:
         - V-02: Integrity validation
         - V-04: No missing page numbers in provenance
         """
-        from src.segmentation import split_pdf, get_page_coverage, get_split_boundaries
-        from src.processor import BatchProcessor
-        from src.reassembly import merge_from_results, get_merge_statistics
         from pypdf import PdfReader
+
+        from src.processor import BatchProcessor
+        from src.reassembly import get_merge_statistics, merge_from_results
+        from src.segmentation import get_page_coverage, get_split_boundaries, split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -245,7 +249,7 @@ class TestEndToEndPipeline:
             results = processor.execute_parallel(chunks)
 
             # Check processing results
-            success_count = sum(1 for r in results if r.get('success'))
+            success_count = sum(1 for r in results if r.get("success"))
             assert success_count > 0, "At least one chunk should succeed"
 
             # Step 3: Merge
@@ -257,8 +261,9 @@ class TestEndToEndPipeline:
                     print(f"Merge statistics: {stats}")
 
                     # V-04: Check page coverage in provenance
-                    assert stats['unique_pages'] > 0 or stats['total_items'] == 0, \
+                    assert stats["unique_pages"] > 0 or stats["total_items"] == 0, (
                         "V-04: Processed document should have page provenance"
+                    )
 
 
 @pytest.mark.integration
@@ -269,9 +274,8 @@ class TestVerificationChecklist:
 
     def test_v01_backend_configuration(self):
         """V-01: Verify V2 Backend is active and maxtasksperchild=1."""
-        from src.config_factory import create_converter
+
         from src.processor import BatchProcessor
-        from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
 
         # Check processor configuration
         processor = BatchProcessor()
@@ -287,6 +291,7 @@ class TestVerificationChecklist:
         and GPU. This test establishes processing works.
         """
         import time
+
         from src.config_factory import create_converter
 
         start_time = time.time()

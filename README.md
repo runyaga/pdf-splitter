@@ -7,6 +7,7 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 - **Smart Splitting**: Auto-selects best strategy based on document structure
 - **Bookmark-Aware**: Respects chapter/section boundaries
 - **Parallel Processing**: Process pools for chunking and Docling conversion
+- **Document Merging**: Custom concatenation with full reference integrity
 - **Image Extraction**: Preserves page images and embedded figures
 - **Memory Safe**: Process isolation prevents memory leaks
 - **Fast Chunking**: Strips annotations to avoid pypdf link resolution overhead
@@ -26,7 +27,7 @@ python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 ```bash
 pdf-splitter analyze document.pdf           # Analyze structure
 pdf-splitter chunk document.pdf -o ./chunks # Create chunks
-pdf-splitter convert ./chunks/ -o docling.json  # Convert to JSON
+pdf-splitter convert ./chunks/ -o docling.json  # Convert to merged Docling JSON
 pdf-splitter validate docling.json ./chunks/    # Validate output
 pdf-splitter compare document.pdf           # Compare strategies
 pdf-splitter batch ./documents/             # Batch analyze
@@ -47,9 +48,10 @@ pdf-splitter batch ./documents/             # Batch analyze
 #   --min-pages N       Min pages per chunk (default: 15)
 
 # Convert options:
-#   -o, --output FILE   Output JSON file
+#   -o, --output FILE   Output JSON (merged Docling document by default)
 #   -w, --workers N     Parallel processes (default: 80% of CPUs)
 #   --maxtasks N        Tasks per worker before restart (default: 1)
+#   --keep-parts        Output individual chunks instead of merged document
 
 # Validate options:
 #   -v, --verbose       Show per-chunk details

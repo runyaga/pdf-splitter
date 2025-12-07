@@ -6,12 +6,11 @@ Splits monolith PDFs into logically safe chunks using:
 2. Fallback: Fixed-range splitting with overlap buffering for flat documents
 """
 
-from pathlib import Path
-from typing import List, Tuple
-from pypdf import PdfReader, PdfWriter
-import tempfile
-import os
 import logging
+import tempfile
+from pathlib import Path
+
+from pypdf import PdfReader, PdfWriter
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +21,8 @@ DEFAULT_OVERLAP = 5
 
 
 def get_split_boundaries(
-    pdf_path: Path,
-    chunk_size: int = DEFAULT_CHUNK_SIZE,
-    overlap: int = DEFAULT_OVERLAP
-) -> List[Tuple[int, int]]:
+    pdf_path: Path, chunk_size: int = DEFAULT_CHUNK_SIZE, overlap: int = DEFAULT_OVERLAP
+) -> list[tuple[int, int]]:
     """
     Determine split boundaries for a PDF document.
 
@@ -62,14 +59,13 @@ def get_split_boundaries(
         return boundaries
 
     # Fallback to fixed-range splitting with overlap
-    logger.info(f"No usable bookmarks, using fixed splitting (chunk_size={chunk_size}, overlap={overlap})")
+    logger.info(
+        f"No usable bookmarks, using fixed splitting (chunk_size={chunk_size}, overlap={overlap})"
+    )
     return _get_fixed_boundaries(total_pages, chunk_size, overlap)
 
 
-def _get_bookmark_boundaries(
-    reader: PdfReader,
-    total_pages: int
-) -> List[Tuple[int, int]]:
+def _get_bookmark_boundaries(reader: PdfReader, total_pages: int) -> list[tuple[int, int]]:
     """
     Extract split boundaries from PDF bookmarks/outlines.
 
@@ -126,11 +122,7 @@ def _get_bookmark_boundaries(
         return []
 
 
-def _get_fixed_boundaries(
-    total_pages: int,
-    chunk_size: int,
-    overlap: int
-) -> List[Tuple[int, int]]:
+def _get_fixed_boundaries(total_pages: int, chunk_size: int, overlap: int) -> list[tuple[int, int]]:
     """
     Generate fixed-size chunk boundaries with overlap buffering.
 
@@ -161,10 +153,10 @@ def _get_fixed_boundaries(
 
 def split_pdf(
     pdf_path: Path,
-    output_dir: Path = None,
+    output_dir: Path | None = None,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
-    overlap: int = DEFAULT_OVERLAP
-) -> List[Path]:
+    overlap: int = DEFAULT_OVERLAP,
+) -> list[Path]:
     """
     Split a PDF into chunks and write them to disk.
 
@@ -199,18 +191,18 @@ def split_pdf(
         chunk_filename = f"chunk_{idx:04d}_pages_{start:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
 
-        logger.debug(f"Writing chunk {idx+1}/{len(boundaries)}: pages {start+1}-{end}")
+        logger.debug(f"Writing chunk {idx + 1}/{len(boundaries)}: pages {start + 1}-{end}")
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
         chunk_paths.append(chunk_path)
-        logger.info(f"Wrote {chunk_filename} ({end-start} pages)")
+        logger.info(f"Wrote {chunk_filename} ({end - start} pages)")
 
     logger.info(f"Split complete: {len(chunk_paths)} chunks in {output_dir}")
     return chunk_paths
 
 
-def get_page_coverage(boundaries: List[Tuple[int, int]], total_pages: int) -> bool:
+def get_page_coverage(boundaries: list[tuple[int, int]], total_pages: int) -> bool:
     """
     Verify that boundaries cover all pages without gaps.
 

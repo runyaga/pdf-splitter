@@ -2,10 +2,10 @@
 Tests for smart_split() unified function.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 import tempfile
+from pathlib import Path
+
+import pytest
 
 
 class TestSplitResult:
@@ -23,7 +23,7 @@ class TestSplitResult:
             min_chunk_size=50,
             max_chunk_size=55,
             avg_chunk_size=52.5,
-            has_overlap=True
+            has_overlap=True,
         )
 
         assert result.num_chunks == 2
@@ -42,7 +42,7 @@ class TestSplitResult:
             min_chunk_size=100,
             max_chunk_size=100,
             avg_chunk_size=100.0,
-            has_overlap=False
+            has_overlap=False,
         )
 
         summary = result.summary()
@@ -58,7 +58,7 @@ class TestSmartSplit:
         """Create a small test PDF (50 pages)."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             for _ in range(50):
                 writer.add_blank_page(width=612, height=792)
@@ -73,7 +73,7 @@ class TestSmartSplit:
         """Create a medium test PDF (150 pages)."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             for _ in range(150):
                 writer.add_blank_page(width=612, height=792)
@@ -88,7 +88,7 @@ class TestSmartSplit:
         """Create a large test PDF (500 pages)."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             for _ in range(500):
                 writer.add_blank_page(width=612, height=792)
@@ -212,7 +212,7 @@ class TestSmartSplitToFiles:
         """Create a test PDF."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             for _ in range(100):
                 writer.add_blank_page(width=612, height=792)
@@ -228,25 +228,22 @@ class TestSmartSplitToFiles:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            chunk_paths, result = smart_split_to_files(
-                test_pdf, output_dir, max_chunk_pages=50
-            )
+            chunk_paths, _result = smart_split_to_files(test_pdf, output_dir, max_chunk_pages=50)
 
             assert len(chunk_paths) >= 2
             for path in chunk_paths:
                 assert path.exists()
-                assert path.suffix == '.pdf'
+                assert path.suffix == ".pdf"
 
     def test_chunk_files_have_correct_pages(self, test_pdf):
         """Test that chunk files contain correct number of pages."""
-        from src.segmentation_enhanced import smart_split_to_files
         from pypdf import PdfReader
+
+        from src.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
-            chunk_paths, result = smart_split_to_files(
-                test_pdf, output_dir, max_chunk_pages=50
-            )
+            chunk_paths, result = smart_split_to_files(test_pdf, output_dir, max_chunk_pages=50)
 
             total_chunk_pages = 0
             for i, path in enumerate(chunk_paths):
@@ -267,9 +264,7 @@ class TestSmartSplitToFiles:
         """Test that temp directory is used when output_dir is None."""
         from src.segmentation_enhanced import smart_split_to_files
 
-        chunk_paths, result = smart_split_to_files(
-            test_pdf, output_dir=None, max_chunk_pages=50
-        )
+        chunk_paths, _result = smart_split_to_files(test_pdf, output_dir=None, max_chunk_pages=50)
 
         assert len(chunk_paths) >= 1
         # Should be in a temp directory
@@ -289,7 +284,7 @@ class TestParallelChunkWriting:
         """Create a test PDF with 100 pages."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             for _ in range(100):
                 writer.add_blank_page(width=612, height=792)
@@ -301,19 +296,18 @@ class TestParallelChunkWriting:
 
     def test_parallel_creates_same_chunks_as_sequential(self, test_pdf):
         """Test that parallel and sequential produce same results."""
-        from src.segmentation_enhanced import smart_split_to_files
         from pypdf import PdfReader
 
-        with tempfile.TemporaryDirectory() as tmpdir1, \
-             tempfile.TemporaryDirectory() as tmpdir2:
+        from src.segmentation_enhanced import smart_split_to_files
 
+        with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
             # Parallel
-            parallel_paths, parallel_result = smart_split_to_files(
+            parallel_paths, _parallel_result = smart_split_to_files(
                 test_pdf, Path(tmpdir1), max_chunk_pages=25, parallel=True
             )
 
             # Sequential
-            seq_paths, seq_result = smart_split_to_files(
+            seq_paths, _seq_result = smart_split_to_files(
                 test_pdf, Path(tmpdir2), max_chunk_pages=25, parallel=False
             )
 
@@ -321,7 +315,7 @@ class TestParallelChunkWriting:
             assert len(parallel_paths) == len(seq_paths)
 
             # Same page counts in each chunk
-            for p_path, s_path in zip(sorted(parallel_paths), sorted(seq_paths)):
+            for p_path, s_path in zip(sorted(parallel_paths), sorted(seq_paths), strict=True):
                 p_reader = PdfReader(str(p_path))
                 s_reader = PdfReader(str(s_path))
                 assert len(p_reader.pages) == len(s_reader.pages)
@@ -331,11 +325,8 @@ class TestParallelChunkWriting:
         from src.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            chunk_paths, result = smart_split_to_files(
-                test_pdf, Path(tmpdir),
-                max_chunk_pages=20,
-                max_workers=2,
-                parallel=True
+            chunk_paths, _result = smart_split_to_files(
+                test_pdf, Path(tmpdir), max_chunk_pages=20, max_workers=2, parallel=True
             )
 
             assert len(chunk_paths) >= 5
@@ -347,10 +338,8 @@ class TestParallelChunkWriting:
         from src.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            chunk_paths, result = smart_split_to_files(
-                test_pdf, Path(tmpdir),
-                max_chunk_pages=25,
-                parallel=False
+            chunk_paths, _result = smart_split_to_files(
+                test_pdf, Path(tmpdir), max_chunk_pages=25, parallel=False
             )
 
             assert len(chunk_paths) >= 4
@@ -364,9 +353,7 @@ class TestParallelChunkWriting:
         with tempfile.TemporaryDirectory() as tmpdir:
             # 100 pages, max 200 = single chunk
             chunk_paths, result = smart_split_to_files(
-                test_pdf, Path(tmpdir),
-                max_chunk_pages=200,
-                parallel=True
+                test_pdf, Path(tmpdir), max_chunk_pages=200, parallel=True
             )
 
             assert len(chunk_paths) == 1
@@ -374,19 +361,20 @@ class TestParallelChunkWriting:
 
     def test_parallel_maintains_order(self, test_pdf):
         """Test that parallel writing maintains chunk order."""
-        from src.segmentation_enhanced import smart_split_to_files
         from pypdf import PdfReader
+
+        from src.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunk_paths, result = smart_split_to_files(
-                test_pdf, Path(tmpdir),
-                max_chunk_pages=20,
-                parallel=True
+                test_pdf, Path(tmpdir), max_chunk_pages=20, parallel=True
             )
 
             # Verify chunks are named in order and have expected pages
-            for i, (path, (start, end)) in enumerate(zip(chunk_paths, result.boundaries)):
-                expected_name = f"chunk_{i:04d}_pages_{start+1:04d}_{end:04d}.pdf"
+            for i, (path, (start, end)) in enumerate(
+                zip(chunk_paths, result.boundaries, strict=True)
+            ):
+                expected_name = f"chunk_{i:04d}_pages_{start + 1:04d}_{end:04d}.pdf"
                 assert path.name == expected_name
 
                 reader = PdfReader(str(path))
@@ -460,5 +448,4 @@ class TestSmartSplitOnRealPDFs:
             # No single chunk should exceed 50% of document for large docs
             if result.total_pages > 200:
                 max_ratio = result.max_chunk_size / result.total_pages
-                assert max_ratio < 0.5, \
-                    f"max chunk is {max_ratio:.0%} of document"
+                assert max_ratio < 0.5, f"max chunk is {max_ratio:.0%} of document"

@@ -9,17 +9,16 @@ not passed from the main thread. This ensures the C++ backend is initialized
 in the correct process space.
 """
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from pathlib import Path
-from typing import List, Optional, Dict, Any
 import logging
 import os
-
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def _process_chunk(chunk_path: str, verbose: bool = False) -> Dict[str, Any]:
+def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
     """
     Worker function to process a single PDF chunk.
 
@@ -43,20 +42,22 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> Dict[str, Any]:
     # With maxtasksperchild=1, the process dies after one chunk anyway,
     # so letting the OS reclaim memory is faster than Python GC.
     import gc
+
     gc.disable()
 
     # Configure logging in worker process based on verbose flag
     import logging
+
     level = logging.INFO if verbose else logging.WARNING
     logging.basicConfig(level=level, force=True)
-    for logger_name in ['docling', 'docling_core', 'docling_parse', 'src']:
+    for logger_name in ["docling", "docling_core", "docling_parse", "src"]:
         logging.getLogger(logger_name).setLevel(level)
 
     # Import inside worker to ensure proper process isolation
-    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
-    from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
+    from docling.document_converter import DocumentConverter, PdfFormatOption
 
     try:
         # Create converter with image extraction enabled
@@ -69,8 +70,7 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> Dict[str, Any]:
         converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
-                    pipeline_options=pipeline_opts,
-                    backend=DoclingParseV2DocumentBackend
+                    pipeline_options=pipeline_opts, backend=DoclingParseV2DocumentBackend
                 )
             }
         )
@@ -82,20 +82,10 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> Dict[str, Any]:
         # Serialize document for cross-process transfer
         doc_json = doc.export_to_dict()
 
-        return {
-            'success': True,
-            'chunk_path': chunk_path,
-            'document_dict': doc_json,
-            'error': None
-        }
+        return {"success": True, "chunk_path": chunk_path, "document_dict": doc_json, "error": None}
 
     except Exception as e:
-        return {
-            'success': False,
-            'chunk_path': chunk_path,
-            'document_dict': None,
-            'error': str(e)
-        }
+        return {"success": False, "chunk_path": chunk_path, "document_dict": None, "error": str(e)}
 
 
 class BatchProcessor:
@@ -107,10 +97,7 @@ class BatchProcessor:
     """
 
     def __init__(
-        self,
-        max_workers: Optional[int] = None,
-        maxtasksperchild: int = 1,
-        verbose: bool = False
+        self, max_workers: int | None = None, maxtasksperchild: int = 1, verbose: bool = False
     ):
         """
         Initialize the batch processor.
@@ -126,10 +113,8 @@ class BatchProcessor:
         self.verbose = verbose
 
     def execute_parallel(
-        self,
-        chunk_paths: List[Path],
-        ordered: bool = True
-    ) -> List[Dict[str, Any]]:
+        self, chunk_paths: list[Path], ordered: bool = True
+    ) -> list[dict[str, Any]]:
         """
         Process multiple PDF chunks in parallel.
 
@@ -154,14 +139,15 @@ class BatchProcessor:
 
         completed_count = 0
         with ProcessPoolExecutor(
-            max_workers=self.max_workers,
-            max_tasks_per_child=self.maxtasksperchild
+            max_workers=self.max_workers, max_tasks_per_child=self.maxtasksperchild
         ) as executor:
             # Submit all chunks
             future_to_path = {}
             for path in chunk_str_paths:
                 idx = path_to_idx[path]
-                logger.debug(f"[BEGIN] Submitting chunk {idx + 1}/{len(chunk_paths)}: {Path(path).name}")
+                logger.debug(
+                    f"[BEGIN] Submitting chunk {idx + 1}/{len(chunk_paths)}: {Path(path).name}"
+                )
                 future = executor.submit(_process_chunk, path, self.verbose)
                 future_to_path[future] = path
 
@@ -178,30 +164,34 @@ class BatchProcessor:
                     results[idx] = result
                     completed_count += 1
 
-                    if result['success']:
-                        logger.debug(f"Processed {completed_count}/{len(chunk_paths)}: {chunk_name}")
+                    if result["success"]:
+                        logger.debug(
+                            f"Processed {completed_count}/{len(chunk_paths)}: {chunk_name}"
+                        )
                     else:
                         logger.error(
                             f"[FAILED] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {result['error']}"
                         )
 
                 except Exception as e:
-                    logger.error(f"[EXCEPTION] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {e}")
+                    logger.error(
+                        f"[EXCEPTION] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {e}"
+                    )
                     results[idx] = {
-                        'success': False,
-                        'chunk_path': path,
-                        'document_dict': None,
-                        'error': str(e)
+                        "success": False,
+                        "chunk_path": path,
+                        "document_dict": None,
+                        "error": str(e),
                     }
 
         # Summary
-        success_count = sum(1 for r in results if r and r.get('success'))
+        success_count = sum(1 for r in results if r and r.get("success"))
         fail_count = len(chunk_paths) - success_count
         logger.debug(f"Processing complete: {success_count} succeeded, {fail_count} failed")
 
         return results if ordered else [r for r in results if r is not None]
 
-    def execute_sequential(self, chunk_paths: List[Path]) -> List[Dict[str, Any]]:
+    def execute_sequential(self, chunk_paths: list[Path]) -> list[dict[str, Any]]:
         """
         Process chunks sequentially (useful for debugging or memory testing).
 
@@ -217,7 +207,7 @@ class BatchProcessor:
             result = _process_chunk(str(chunk_path), self.verbose)
             results.append(result)
 
-            if not result['success']:
+            if not result["success"]:
                 logger.error(f"Failed: {result['error']}")
 
         return results

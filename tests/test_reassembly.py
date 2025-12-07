@@ -5,8 +5,9 @@ Tests document concatenation, page number monotonicity,
 and proper handling of provenance data.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestMergeDocuments:
@@ -27,65 +28,97 @@ class TestMergeDocuments:
         result = merge_documents([mock_doc])
         assert result is mock_doc
 
-    def test_merge_multiple_documents_calls_concatenate(self):
-        """Test that merge calls concatenate for each additional document."""
+    @patch("src.reassembly.DoclingDocument")
+    def test_merge_multiple_documents_uses_custom_concat(self, mock_doc_class):
+        """Test that merge uses custom concatenation for multiple documents."""
+        from src.reassembly import merge_documents
+
+        # Create minimal valid document dicts
+        doc1 = MagicMock()
+        doc2 = MagicMock()
+        doc1.export_to_dict.return_value = {
+            "name": "doc1",
+            "pages": {"1": {"page_no": 1}},
+            "texts": [],
+            "body": {"self_ref": "#/body", "children": []},
+            "furniture": {"self_ref": "#/furniture", "children": []},
+        }
+        doc2.export_to_dict.return_value = {
+            "name": "doc2",
+            "pages": {"1": {"page_no": 1}},
+            "texts": [],
+            "body": {"self_ref": "#/body", "children": []},
+            "furniture": {"self_ref": "#/furniture", "children": []},
+        }
+
+        mock_merged = MagicMock()
+        mock_doc_class.model_validate.return_value = mock_merged
+
+        result = merge_documents([doc1, doc2])
+
+        # Should call export_to_dict on each document
+        doc1.export_to_dict.assert_called_once()
+        doc2.export_to_dict.assert_called_once()
+        # Should validate the merged dict
+        mock_doc_class.model_validate.assert_called_once()
+        assert result is mock_merged
+
+    @patch("src.reassembly.DoclingDocument")
+    def test_merge_handles_validation_error(self, mock_doc_class):
+        """Test that merge raises on validation failure."""
         from src.reassembly import merge_documents
 
         doc1 = MagicMock()
         doc2 = MagicMock()
-        doc3 = MagicMock()
+        doc1.export_to_dict.return_value = {
+            "name": "doc1",
+            "pages": {"1": {"page_no": 1}},
+            "texts": [],
+            "body": {"self_ref": "#/body", "children": []},
+            "furniture": {"self_ref": "#/furniture", "children": []},
+        }
+        doc2.export_to_dict.return_value = {
+            "name": "doc2",
+            "pages": {"1": {"page_no": 1}},
+            "texts": [],
+            "body": {"self_ref": "#/body", "children": []},
+            "furniture": {"self_ref": "#/furniture", "children": []},
+        }
+        mock_doc_class.model_validate.side_effect = Exception("Validation failed")
 
-        # Setup concatenate chain
-        merged_1_2 = MagicMock()
-        doc1.concatenate.return_value = merged_1_2
-        merged_1_2.concatenate.return_value = MagicMock()
-
-        result = merge_documents([doc1, doc2, doc3])
-
-        doc1.concatenate.assert_called_once_with(doc2)
-        merged_1_2.concatenate.assert_called_once_with(doc3)
-
-    def test_merge_handles_concatenate_error(self):
-        """Test that merge raises on concatenate failure."""
-        from src.reassembly import merge_documents
-
-        doc1 = MagicMock()
-        doc2 = MagicMock()
-        doc1.concatenate.side_effect = Exception("Merge failed")
-
-        with pytest.raises(Exception, match="Merge failed"):
+        with pytest.raises(Exception, match="Validation failed"):
             merge_documents([doc1, doc2])
 
 
 class TestMergeFromResults:
     """Tests for merge_from_results function."""
 
-    @patch('src.reassembly.DoclingDocument')
+    @patch("src.reassembly.DoclingDocument")
     def test_merge_from_results_skips_failed(self, mock_doc_class):
         """Test that failed results are skipped."""
         from src.reassembly import merge_from_results
 
         results = [
-            {'success': False, 'error': 'Failed', 'document_dict': None},
-            {'success': True, 'document_dict': {'test': 'data'}},
+            {"success": False, "error": "Failed", "document_dict": None},
+            {"success": True, "document_dict": {"test": "data"}},
         ]
 
         mock_doc = MagicMock()
         mock_doc_class.model_validate.return_value = mock_doc
 
-        result = merge_from_results(results)
+        merge_from_results(results)
 
         # Should only process successful result
-        mock_doc_class.model_validate.assert_called_once_with({'test': 'data'})
+        mock_doc_class.model_validate.assert_called_once_with({"test": "data"})
 
-    @patch('src.reassembly.DoclingDocument')
+    @patch("src.reassembly.DoclingDocument")
     def test_merge_from_results_all_failed_returns_none(self, mock_doc_class):
         """Test that all-failed results returns None."""
         from src.reassembly import merge_from_results
 
         results = [
-            {'success': False, 'error': 'Failed 1', 'document_dict': None},
-            {'success': False, 'error': 'Failed 2', 'document_dict': None},
+            {"success": False, "error": "Failed 1", "document_dict": None},
+            {"success": False, "error": "Failed 2", "document_dict": None},
         ]
 
         result = merge_from_results(results)
@@ -196,10 +229,10 @@ class TestGetMergeStatistics:
 
         stats = get_merge_statistics(mock_doc)
 
-        assert stats['total_items'] == 0
-        assert stats['tables'] == 0
-        assert stats['text_items'] == 0
-        assert stats['unique_pages'] == 0
+        assert stats["total_items"] == 0
+        assert stats["tables"] == 0
+        assert stats["text_items"] == 0
+        assert stats["unique_pages"] == 0
 
     def test_statistics_counts_item_types(self):
         """Test that statistics correctly count item types."""
@@ -207,11 +240,11 @@ class TestGetMergeStatistics:
 
         # Create mock items of different types
         table_item = MagicMock()
-        table_item.__class__.__name__ = 'TableItem'
+        table_item.__class__.__name__ = "TableItem"
         table_item.prov = []
 
         text_item = MagicMock()
-        text_item.__class__.__name__ = 'TextItem'
+        text_item.__class__.__name__ = "TextItem"
         text_item.prov = []
 
         mock_doc = MagicMock()
@@ -223,6 +256,6 @@ class TestGetMergeStatistics:
 
         stats = get_merge_statistics(mock_doc)
 
-        assert stats['total_items'] == 3
-        assert stats['tables'] == 1
-        assert stats['text_items'] == 2
+        assert stats["total_items"] == 3
+        assert stats["tables"] == 1
+        assert stats["text_items"] == 2

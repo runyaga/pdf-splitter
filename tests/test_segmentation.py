@@ -5,11 +5,11 @@ Tests split logic to verify segmentation does not lose pages
 and properly handles bookmarks and fallback splitting.
 """
 
-import pytest
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import tempfile
-import os
+
+import pytest
 
 
 class TestGetSplitBoundaries:
@@ -19,7 +19,7 @@ class TestGetSplitBoundaries:
         """Test that empty PDF returns empty boundary list."""
         from src.segmentation import get_split_boundaries
 
-        with patch('src.segmentation.PdfReader') as mock_reader_class:
+        with patch("src.segmentation.PdfReader") as mock_reader_class:
             mock_reader = MagicMock()
             mock_reader.pages = []
             mock_reader_class.return_value = mock_reader
@@ -31,7 +31,7 @@ class TestGetSplitBoundaries:
         """Test that single page PDF returns single boundary."""
         from src.segmentation import get_split_boundaries
 
-        with patch('src.segmentation.PdfReader') as mock_reader_class:
+        with patch("src.segmentation.PdfReader") as mock_reader_class:
             mock_reader = MagicMock()
             mock_reader.pages = [MagicMock()]  # 1 page
             mock_reader.outline = []
@@ -129,9 +129,7 @@ class TestBookmarkBoundaries:
         ]
 
         # Mock get_destination_page_number to return sequential pages
-        mock_reader.get_destination_page_number = MagicMock(
-            side_effect=[0, 25, 60]
-        )
+        mock_reader.get_destination_page_number = MagicMock(side_effect=[0, 25, 60])
 
         boundaries = _get_bookmark_boundaries(mock_reader, 100)
 
@@ -168,7 +166,7 @@ class TestSplitPdf:
         """Create a simple test PDF."""
         from pypdf import PdfWriter
 
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             writer = PdfWriter()
             # Create 10 blank pages
             for _ in range(10):
@@ -193,12 +191,13 @@ class TestSplitPdf:
             assert len(chunks) > 0
             for chunk_path in chunks:
                 assert chunk_path.exists()
-                assert chunk_path.suffix == '.pdf'
+                assert chunk_path.suffix == ".pdf"
 
     def test_split_pdf_coverage(self, sample_pdf):
         """Test that split preserves all pages."""
-        from src.segmentation import split_pdf, get_split_boundaries, get_page_coverage
         from pypdf import PdfReader
+
+        from src.segmentation import get_page_coverage, get_split_boundaries
 
         boundaries = get_split_boundaries(sample_pdf, chunk_size=3, overlap=1)
         total_pages = len(PdfReader(str(sample_pdf)).pages)

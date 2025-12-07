@@ -11,10 +11,10 @@ Optimizations:
 - Image generation disabled: Prevents OOM risk
 """
 
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
-from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
+from docling.document_converter import DocumentConverter, PdfFormatOption
 
 
 def create_converter() -> DocumentConverter:
@@ -40,8 +40,7 @@ def create_converter() -> DocumentConverter:
     return DocumentConverter(
         format_options={
             InputFormat.PDF: PdfFormatOption(
-                pipeline_options=pipeline_opts,
-                backend=DoclingParseV2DocumentBackend
+                pipeline_options=pipeline_opts, backend=DoclingParseV2DocumentBackend
             )
         }
     )

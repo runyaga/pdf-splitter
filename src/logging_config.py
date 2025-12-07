@@ -14,8 +14,6 @@ Usage:
 
 import logging
 import sys
-from typing import Optional
-
 
 # Package-level logger name
 PACKAGE_NAME = "src"
@@ -26,11 +24,7 @@ VERBOSE_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 VERBOSE_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
-def setup_logging(
-    verbose: bool = False,
-    level: Optional[int] = None,
-    stream=None
-) -> None:
+def setup_logging(verbose: bool = False, level: int | None = None, stream=None) -> None:
     """
     Configure logging for the PDF Splitter application.
 
@@ -73,7 +67,7 @@ def setup_logging(
     pkg_logger.setLevel(level)
 
     # Set all relevant loggers to the same level for consistency
-    for logger_name in ['docling', 'docling_core', 'docling_parse']:
+    for logger_name in ["docling", "docling_core", "docling_parse"]:
         logging.getLogger(logger_name).setLevel(level)
 
     if verbose:
