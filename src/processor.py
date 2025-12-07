@@ -102,7 +102,8 @@ class BatchProcessor:
             max_workers: Maximum parallel workers (defaults to CPU count)
             maxtasksperchild: Tasks per worker before restart (default 1 for memory isolation)
         """
-        self.max_workers = max_workers or os.cpu_count()
+        # Default to 80% of CPUs to leave headroom for other processes
+        self.max_workers = max_workers or max(1, int((os.cpu_count() or 4) * 0.8))
         self.maxtasksperchild = maxtasksperchild
 
     def execute_parallel(

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 from pypdf import PdfReader, PdfWriter
 from dataclasses import dataclass
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import tempfile
 import logging
 import os
@@ -234,8 +234,8 @@ def _write_single_chunk(
     end: int,
     idx: int,
     total_chunks: int,
-    output_dir: Path
-) -> Tuple[int, Path, Optional[str]]:
+    output_dir_str: str
+) -> Tuple[int, Optional[str], Optional[str]]:
     """
     Write a single chunk to disk. Designed for parallel execution.
 
@@ -245,10 +245,10 @@ def _write_single_chunk(
         end: End page (exclusive)
         idx: Chunk index
         total_chunks: Total number of chunks
-        output_dir: Output directory
+        output_dir_str: Output directory as string (for cross-process pickling)
 
     Returns:
-        Tuple of (idx, chunk_path, error_message or None)
+        Tuple of (idx, chunk_path_str or None, error_message or None)
     """
     try:
         reader = PdfReader(reader_path)
@@ -259,17 +259,15 @@ def _write_single_chunk(
             writer.add_page(reader.pages[page_num])
 
         chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
-        chunk_path = output_dir / chunk_filename
+        chunk_path = Path(output_dir_str) / chunk_filename
 
-        logger.debug(f"[BEGIN] Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
-        logger.debug(f"[COMPLETE] Chunk {idx+1}/{total_chunks}: {chunk_filename}")
-        return (idx, chunk_path, None)
+        # Return string path for clean cross-process serialization
+        return (idx, str(chunk_path), None)
 
     except Exception as e:
-        logger.error(f"[FAILED] Chunk {idx+1}/{total_chunks}: {e}")
         return (idx, None, str(e))
 
 
@@ -322,9 +320,10 @@ def smart_split_to_files(
 
     total_chunks = len(result.boundaries)
 
-    # Determine worker count
+    # Determine worker count (default 80% of CPUs to leave headroom)
     if max_workers is None:
-        max_workers = min(os.cpu_count() or 4, total_chunks)
+        default_workers = max(1, int((os.cpu_count() or 4) * 0.8))
+        max_workers = min(default_workers, total_chunks)
 
     if parallel and total_chunks > 1:
         chunk_paths = _write_chunks_parallel(
@@ -346,28 +345,40 @@ def _write_chunks_parallel(
     max_workers: int,
     total_chunks: int
 ) -> List[Path]:
-    """Write chunks in parallel using ThreadPoolExecutor."""
+    """Write chunks in parallel using ProcessPoolExecutor.
+
+    Uses processes instead of threads because pypdf is pure Python and
+    CPU-bound. The GIL would serialize thread execution, making ThreadPoolExecutor
+    ineffective. ProcessPoolExecutor bypasses the GIL for true parallelism.
+
+    Note: Unlike the Docling convert command, we don't need max_tasks_per_child
+    since pypdf doesn't have memory leaks.
+    """
     logger.info(
-        f"Parallel chunk writing configuration: max_workers={max_workers}"
+        f"Parallel chunk writing: {max_workers} processes"
     )
     logger.info(f"Beginning parallel write of {total_chunks} chunks")
 
     chunk_paths = [None] * total_chunks
     completed_count = 0
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    # Convert to strings for cross-process pickling
+    pdf_path_str = str(pdf_path)
+    output_dir_str = str(output_dir)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         # Submit all chunk writes
         futures = {}
         for idx, (start, end) in enumerate(boundaries):
             logger.debug(f"[BEGIN] Submitting chunk {idx+1}/{total_chunks} to write pool")
             future = executor.submit(
                 _write_single_chunk,
-                str(pdf_path),
+                pdf_path_str,
                 start,
                 end,
                 idx,
                 total_chunks,
-                output_dir
+                output_dir_str
             )
             futures[future] = idx
 
@@ -375,12 +386,13 @@ def _write_chunks_parallel(
 
         # Collect results as they complete
         for future in as_completed(futures):
-            idx, chunk_path, error = future.result()
+            idx, chunk_path_str, error = future.result()
             completed_count += 1
 
             if error:
                 logger.error(f"Failed to write chunk {idx+1}: {error}")
             else:
+                chunk_path = Path(chunk_path_str)
                 chunk_paths[idx] = chunk_path
                 logger.info(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
 

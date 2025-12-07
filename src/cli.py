@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -98,10 +99,11 @@ def cmd_chunk(args):
 
     # Determine parallelism
     parallel = not args.sequential
-    max_workers = args.workers
+    # Default to 80% of CPUs to leave headroom for other processes
+    max_workers = args.workers or max(1, int((os.cpu_count() or 4) * 0.8))
 
     if parallel:
-        print(f"Parallel writing: enabled (workers: {max_workers or 'auto'})")
+        print(f"Parallel writing: enabled ({max_workers} processes)")
     else:
         print(f"Parallel writing: disabled (sequential mode)")
 
