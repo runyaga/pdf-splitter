@@ -90,6 +90,7 @@ def smart_split(
 
     # Handle edge cases
     if total_pages == 0:
+        logger.debug(f"Empty document: {pdf_path.name}")
         return SplitResult(
             boundaries=[],
             strategy="empty",
@@ -100,6 +101,8 @@ def smart_split(
             avg_chunk_size=0,
             has_overlap=False
         )
+
+    logger.debug(f"Selecting strategy for {total_pages} pages (max={max_chunk_pages}, min={min_chunk_pages})")
 
     # Select strategy
     if force_strategy:
@@ -138,6 +141,7 @@ def _apply_forced_strategy(
     overlap: int
 ) -> Tuple[List[Tuple[int, int]], str]:
     """Apply a specific forced strategy."""
+    logger.info(f"Forcing strategy: {strategy}")
     if strategy == "fixed":
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed"
     elif strategy == "hybrid":
@@ -160,20 +164,25 @@ def _auto_select_strategy(
 
     # Small documents: use fixed splitting
     if total_pages <= max_chunk_pages:
+        logger.debug(f"Small document ({total_pages} pages <= {max_chunk_pages}), using single chunk")
         return [(0, total_pages)], "single_chunk"
 
     if total_pages <= max_chunk_pages * 2:
+        logger.debug(f"Medium document ({total_pages} pages), using fixed_small strategy")
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_small"
 
     # Check for bookmarks
     if not reader.outline:
+        logger.debug("No bookmarks found, using fixed splitting")
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_no_bookmarks"
 
     # Analyze bookmark structure
     all_bookmarks = []
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
+    logger.debug(f"Found {len(all_bookmarks)} bookmarks")
 
     if len(all_bookmarks) < 3:
+        logger.debug(f"Too few bookmarks ({len(all_bookmarks)}), using fixed splitting")
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_few_bookmarks"
 
     # Check for chapter-level structure
@@ -181,24 +190,31 @@ def _auto_select_strategy(
         'CHAPTER' in title.upper() or 'PART' in title.upper()
         for _, _, title in all_bookmarks
     )
+    logger.debug(f"Chapter-level structure detected: {has_chapters}")
 
     if has_chapters:
         # Use hybrid strategy for documents with chapter structure
+        logger.debug("Trying hybrid strategy for chapter-based document")
         boundaries, strategy = get_split_boundaries_hybrid(
             pdf_path, max_chunk_pages, min_chunk_pages, overlap
         )
         if _is_balanced(boundaries, total_pages, MAX_CHUNK_RATIO):
+            logger.info(f"Selected hybrid strategy: {strategy} ({len(boundaries)} chunks)")
             return boundaries, f"auto_{strategy}"
+        logger.debug(f"Hybrid strategy unbalanced, trying enhanced")
 
     # Try enhanced strategy
+    logger.debug("Trying enhanced bookmark strategy")
     boundaries, strategy = get_split_boundaries_enhanced(
         pdf_path, max_chunk_pages, overlap, max_chunk_ratio=MAX_CHUNK_RATIO
     )
 
     if _is_balanced(boundaries, total_pages, MAX_CHUNK_RATIO):
+        logger.info(f"Selected enhanced strategy: {strategy} ({len(boundaries)} chunks)")
         return boundaries, f"auto_{strategy}"
 
     # Final fallback: fixed splitting
+    logger.info(f"Falling back to fixed splitting ({total_pages} pages, chunk_size={max_chunk_pages})")
     return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_fallback"
 
 
@@ -233,6 +249,7 @@ def smart_split_to_files(
         Tuple of (list of chunk file paths, SplitResult metadata)
     """
     pdf_path = Path(pdf_path)
+    logger.info(f"Starting smart split: {pdf_path.name}")
 
     # Get split boundaries
     result = smart_split(
@@ -240,21 +257,28 @@ def smart_split_to_files(
     )
 
     if not result.boundaries:
+        logger.info("No boundaries generated (empty document)")
         return [], result
 
     # Create output directory
     if output_dir is None:
         output_dir = Path(tempfile.mkdtemp(prefix="pdf_chunks_"))
+        logger.debug(f"Created temp output directory: {output_dir}")
     else:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Using output directory: {output_dir}")
 
     # Split PDF
     reader = PdfReader(str(pdf_path))
     chunk_paths = []
+    total_chunks = len(result.boundaries)
+
+    logger.info(f"Writing {total_chunks} chunks using strategy '{result.strategy}'")
 
     for idx, (start, end) in enumerate(result.boundaries):
         writer = PdfWriter()
+        num_pages = end - start
 
         for page_num in range(start, end):
             writer.add_page(reader.pages[page_num])
@@ -262,11 +286,14 @@ def smart_split_to_files(
         chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
 
+        logger.debug(f"Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
         chunk_paths.append(chunk_path)
+        logger.info(f"Wrote chunk {idx+1}/{total_chunks}: {chunk_filename}")
 
+    logger.info(f"Split complete: {total_chunks} chunks written to {output_dir}")
     return chunk_paths, result
 
 
@@ -292,32 +319,39 @@ def get_split_boundaries_enhanced(
     """
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)
+    logger.debug(f"Enhanced strategy: analyzing {total_pages} pages")
 
     if total_pages == 0:
         return [], "empty"
 
     if total_pages == 1:
+        logger.debug("Single page document")
         return [(0, 1)], "single_page"
 
     # Try deep bookmark extraction
     if reader.outline:
+        logger.debug("Document has outline, attempting deep bookmark extraction")
         boundaries, level_used = _get_deep_bookmark_boundaries(
             reader, total_pages, target_level
         )
 
         if boundaries and _is_balanced(boundaries, total_pages, max_chunk_ratio):
+            logger.info(f"Using bookmark level {level_used}: {len(boundaries)} balanced chunks")
             return boundaries, f"bookmark_level_{level_used}"
 
-        logger.info(
-            f"Bookmark boundaries unbalanced, trying rebalancing..."
-        )
-
-        # Try rebalancing large chunks
-        rebalanced = _rebalance_chunks(boundaries, total_pages, chunk_size, overlap)
-        if rebalanced and _is_balanced(rebalanced, total_pages, max_chunk_ratio):
-            return rebalanced, "bookmark_rebalanced"
+        if boundaries:
+            logger.debug(f"Bookmark boundaries unbalanced ({len(boundaries)} chunks), trying rebalancing")
+            # Try rebalancing large chunks
+            rebalanced = _rebalance_chunks(boundaries, total_pages, chunk_size, overlap)
+            if rebalanced and _is_balanced(rebalanced, total_pages, max_chunk_ratio):
+                logger.info(f"Rebalanced to {len(rebalanced)} chunks")
+                return rebalanced, "bookmark_rebalanced"
+            logger.debug("Rebalancing did not produce balanced chunks")
+    else:
+        logger.debug("No outline found in document")
 
     # Fallback to fixed splitting
+    logger.debug(f"Using fixed splitting (chunk_size={chunk_size}, overlap={overlap})")
     boundaries = _get_fixed_boundaries(total_pages, chunk_size, overlap)
     return boundaries, "fixed"
 
@@ -335,8 +369,10 @@ def _get_deep_bookmark_boundaries(
     # Collect all bookmarks with their levels
     all_bookmarks = []
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
+    logger.debug(f"Deep bookmark scan: found {len(all_bookmarks)} total bookmarks")
 
     if not all_bookmarks:
+        logger.debug("No bookmarks collected")
         return [], -1
 
     # Group by level
@@ -346,17 +382,23 @@ def _get_deep_bookmark_boundaries(
             by_level[level] = []
         by_level[level].append(page)
 
+    logger.debug(f"Bookmark levels found: {sorted(by_level.keys())} with counts {[len(by_level[k]) for k in sorted(by_level.keys())]}")
+
     # Find the best level
     if target_level is not None and target_level in by_level:
         best_level = target_level
+        logger.debug(f"Using specified target level: {target_level}")
     else:
         best_level = _find_optimal_level(by_level, total_pages)
+        logger.debug(f"Auto-selected optimal level: {best_level}")
 
     if best_level < 0:
+        logger.debug("No suitable bookmark level found")
         return [], -1
 
     # Build boundaries from the chosen level
     page_numbers = sorted(set(by_level[best_level]))
+    logger.debug(f"Level {best_level} has {len(page_numbers)} unique page boundaries")
 
     # Ensure we start from page 0
     if page_numbers[0] != 0:
@@ -369,6 +411,7 @@ def _get_deep_bookmark_boundaries(
         if start < end:
             boundaries.append((start, end))
 
+    logger.debug(f"Generated {len(boundaries)} boundaries from level {best_level}")
     return boundaries, best_level
 
 
@@ -617,17 +660,20 @@ def get_split_boundaries_hybrid(
     """
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)
+    logger.debug(f"Hybrid strategy: analyzing {total_pages} pages")
 
     if total_pages == 0:
         return [], "empty"
 
     if total_pages <= max_chunk_pages:
+        logger.debug(f"Document fits in single chunk ({total_pages} <= {max_chunk_pages})")
         return [(0, total_pages)], "single_chunk"
 
     # Collect all bookmarks
     all_bookmarks = []
     if reader.outline:
         _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
+    logger.debug(f"Collected {len(all_bookmarks)} bookmarks for hybrid analysis")
 
     # Group by level
     by_level: Dict[int, List[Tuple[int, str]]] = {}
@@ -642,22 +688,26 @@ def get_split_boundaries_hybrid(
         titles = [t for p, t in items]
         if any('CHAPTER' in t.upper() or 'PART' in t.upper() for t in titles):
             chapter_level = level
+            logger.debug(f"Found chapter-level bookmarks at level {level} ({len(items)} items)")
             break
 
     if chapter_level is None:
         # Fall back to fixed splitting
+        logger.debug("No chapter-level bookmarks found, falling back to fixed")
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed"
 
     # Get chapter boundaries
     chapter_pages = sorted(set(p for p, t in by_level[chapter_level]))
     if chapter_pages[0] != 0:
         chapter_pages.insert(0, 0)
+    logger.debug(f"Chapter boundaries at pages: {chapter_pages}")
 
     # Get section boundaries (one level deeper)
     section_level = chapter_level + 1
     section_pages = set()
     if section_level in by_level:
         section_pages = set(p for p, t in by_level[section_level])
+        logger.debug(f"Found {len(section_pages)} section boundaries at level {section_level}")
 
     # Build final boundaries
     final_boundaries = []
@@ -670,15 +720,18 @@ def get_split_boundaries_hybrid(
 
         if chap_size <= max_chunk_pages:
             # Chapter fits in one chunk
+            logger.debug(f"Chapter {i+1}: pages {chap_start+1}-{chap_end} ({chap_size} pages) - single chunk")
             final_boundaries.append((chap_start, chap_end))
         else:
             # Subdivide large chapter
+            logger.debug(f"Chapter {i+1}: pages {chap_start+1}-{chap_end} ({chap_size} pages) - needs subdivision")
             # First try using section boundaries
             relevant_sections = sorted([p for p in section_pages
                                        if chap_start < p < chap_end])
 
             if relevant_sections:
                 # Use section boundaries
+                logger.debug(f"  Using {len(relevant_sections)} section boundaries")
                 section_points = [chap_start] + relevant_sections + [chap_end]
                 sub_boundaries = []
 
@@ -695,18 +748,23 @@ def get_split_boundaries_hybrid(
                 strategy_parts.append(f"ch{i+1}:sections")
             else:
                 # Fixed split for this chapter
+                logger.debug(f"  No sections found, using fixed split")
                 sub = _get_fixed_boundaries(chap_size, max_chunk_pages, overlap)
                 for s, e in sub:
                     final_boundaries.append((chap_start + s, chap_start + e))
                 strategy_parts.append(f"ch{i+1}:fixed")
 
     # Final merge pass for tiny chunks
+    pre_merge_count = len(final_boundaries)
     final_boundaries = _merge_tiny_chunks(final_boundaries, min_chunk_pages)
+    if len(final_boundaries) != pre_merge_count:
+        logger.debug(f"Merged tiny chunks: {pre_merge_count} -> {len(final_boundaries)}")
 
     strategy = f"hybrid_chapter_l{chapter_level}"
     if strategy_parts:
         strategy += f"({','.join(strategy_parts[:3])}{'...' if len(strategy_parts) > 3 else ''})"
 
+    logger.info(f"Hybrid strategy complete: {len(final_boundaries)} chunks")
     return final_boundaries, strategy
 
 

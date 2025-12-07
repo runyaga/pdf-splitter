@@ -11,7 +11,9 @@ from typing import List, Tuple
 from pypdf import PdfReader, PdfWriter
 import tempfile
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 # Default chunk size for fallback splitting
 DEFAULT_CHUNK_SIZE = 50
@@ -41,20 +43,26 @@ def get_split_boundaries(
     """
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)
+    logger.debug(f"Analyzing {pdf_path.name}: {total_pages} pages")
 
     if total_pages == 0:
+        logger.debug("Empty document, no boundaries")
         return []
 
     if total_pages == 1:
+        logger.debug("Single page document")
         return [(0, 1)]
 
     # Try smart splitting based on bookmarks
     boundaries = _get_bookmark_boundaries(reader, total_pages)
 
     if boundaries:
+        logger.info(f"Using bookmark-based splitting: {len(boundaries)} chunks")
+        logger.debug(f"Bookmark boundaries: {boundaries}")
         return boundaries
 
     # Fallback to fixed-range splitting with overlap
+    logger.info(f"No usable bookmarks, using fixed splitting (chunk_size={chunk_size}, overlap={overlap})")
     return _get_fixed_boundaries(total_pages, chunk_size, overlap)
 
 
@@ -171,12 +179,16 @@ def split_pdf(
     """
     if output_dir is None:
         output_dir = Path(tempfile.mkdtemp(prefix="pdf_chunks_"))
+        logger.debug(f"Created temp output directory: {output_dir}")
     else:
         output_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug(f"Using output directory: {output_dir}")
 
     reader = PdfReader(str(pdf_path))
     boundaries = get_split_boundaries(pdf_path, chunk_size, overlap)
     chunk_paths = []
+
+    logger.info(f"Splitting {pdf_path.name} into {len(boundaries)} chunks")
 
     for idx, (start, end) in enumerate(boundaries):
         writer = PdfWriter()
@@ -187,11 +199,14 @@ def split_pdf(
         chunk_filename = f"chunk_{idx:04d}_pages_{start:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
 
+        logger.debug(f"Writing chunk {idx+1}/{len(boundaries)}: pages {start+1}-{end}")
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
         chunk_paths.append(chunk_path)
+        logger.info(f"Wrote {chunk_filename} ({end-start} pages)")
 
+    logger.info(f"Split complete: {len(chunk_paths)} chunks in {output_dir}")
     return chunk_paths
 
 

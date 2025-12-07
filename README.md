@@ -65,7 +65,7 @@ pdf-splitter split --help
 #   --max-pages N    Maximum pages per chunk (default: 100)
 #   --min-pages N    Minimum pages per chunk (default: 15)
 #   --overlap N      Overlap pages between chunks (default: 5)
-#   -v, --verbose    Verbose output
+#   -v, --verbose    Show detailed progress (chunk writes, strategy decisions)
 
 # Split-specific options:
 #   -o, --output     Output directory

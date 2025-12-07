@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from src.logging_config import setup_logging
+
 
 def cmd_analyze(args):
     """Analyze a PDF and show splitting recommendations."""
@@ -295,6 +297,9 @@ Examples:
     if not args.command:
         parser.print_help()
         return 1
+
+    # Configure logging based on verbosity
+    setup_logging(verbose=args.verbose)
 
     return args.func(args)
 
