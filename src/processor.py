@@ -51,12 +51,12 @@ def _process_chunk(chunk_path: str) -> Dict[str, Any]:
     from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
 
     try:
-        # Create converter with optimized settings
+        # Create converter with image extraction enabled
         pipeline_opts = PdfPipelineOptions()
         pipeline_opts.do_ocr = False
         pipeline_opts.table_structure_options.mode = TableFormerMode.FAST
-        pipeline_opts.generate_page_images = False
-        pipeline_opts.generate_picture_images = False
+        pipeline_opts.generate_page_images = True
+        pipeline_opts.generate_picture_images = True
 
         converter = DocumentConverter(
             format_options={

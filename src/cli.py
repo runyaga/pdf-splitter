@@ -155,14 +155,15 @@ def cmd_convert(args):
         print(f"Error: Path not found: {input_path}", file=sys.stderr)
         return 1
 
-    print(f"{'='*70}")
-    print(f"DOCLING CONVERSION")
-    print(f"{'='*70}")
-    print(f"Input: {input_path}")
-    print(f"Chunks to process: {len(chunk_paths)}")
-    print(f"Workers: {args.workers or 'auto (CPU count)'}")
-    print(f"Tasks per worker: {args.maxtasks}")
-    print()
+    if args.verbose:
+        print(f"{'='*70}")
+        print(f"DOCLING CONVERSION")
+        print(f"{'='*70}")
+        print(f"Input: {input_path}")
+        print(f"Chunks to process: {len(chunk_paths)}")
+        print(f"Workers: {args.workers or 'auto (CPU count)'}")
+        print(f"Tasks per worker: {args.maxtasks}")
+        print()
 
     # Create processor
     processor = BatchProcessor(
@@ -177,19 +178,24 @@ def cmd_convert(args):
     success_count = sum(1 for r in results if r and r.get('success'))
     fail_count = len(results) - success_count
 
-    print(f"\n{'='*70}")
-    print(f"PROCESSING COMPLETE")
-    print(f"{'='*70}")
-    print(f"Total chunks: {len(results)}")
-    print(f"Succeeded: {success_count}")
-    print(f"Failed: {fail_count}")
-
     if args.verbose:
+        print(f"\n{'='*70}")
+        print(f"PROCESSING COMPLETE")
+        print(f"{'='*70}")
+        print(f"Total chunks: {len(results)}")
+        print(f"Succeeded: {success_count}")
+        print(f"Failed: {fail_count}")
         print(f"\nResults:")
         for r in results:
             if r:
                 status = "OK" if r['success'] else f"FAIL: {r['error']}"
                 print(f"  {Path(r['chunk_path']).name}: {status}")
+    else:
+        # Minimal output by default
+        if fail_count > 0:
+            print(f"Converted {success_count}/{len(results)} chunks ({fail_count} failed)")
+        else:
+            print(f"Converted {len(results)} chunks")
 
     # Output results if requested
     if args.output:
@@ -322,7 +328,7 @@ def _add_common_options(parser):
     parser.add_argument("--overlap", type=int, default=0,
                         help="Overlap pages between chunks (default: 0)")
     parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Verbose output")
+                        help="Enable INFO level logging (default: WARNING)")
 
 
 def _validate_options(args):
@@ -397,7 +403,7 @@ Examples:
     p_convert.add_argument("--maxtasks", type=int, default=1,
                            help="Tasks per worker before restart (default: 1 for memory isolation)")
     p_convert.add_argument("-v", "--verbose", action="store_true",
-                           help="Verbose output")
+                           help="Enable INFO level logging (default: WARNING)")
     p_convert.set_defaults(func=cmd_convert)
 
     # compare command

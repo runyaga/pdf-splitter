@@ -37,14 +37,14 @@ def setup_logging(
     Should be called once at application startup (e.g., in CLI main()).
 
     Args:
-        verbose: If True, use DEBUG level with detailed format.
-                 If False, use INFO level with concise format.
+        verbose: If True, use INFO level with detailed format.
+                 If False, use WARNING level with concise format.
         level: Override the logging level (e.g., logging.WARNING).
                If None, determined by verbose flag.
         stream: Output stream (defaults to sys.stdout).
     """
     if level is None:
-        level = logging.DEBUG if verbose else logging.INFO
+        level = logging.INFO if verbose else logging.WARNING
 
     if stream is None:
         stream = sys.stdout
@@ -73,7 +73,7 @@ def setup_logging(
     pkg_logger.setLevel(level)
 
     if verbose:
-        pkg_logger.debug("Verbose logging enabled")
+        pkg_logger.info("Verbose logging enabled")
 
 
 def get_logger(name: str) -> logging.Logger:

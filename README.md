@@ -4,110 +4,64 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 
 ## Features
 
-- **Smart Splitting**: Auto-selects the best strategy based on document structure
-- **Bookmark-Aware**: Respects chapter/section boundaries when available
-- **Balanced Chunks**: Ensures no single chunk dominates (prevents 1000+ page chunks)
-- **Parallel I/O**: Writes chunk files in parallel using process pool (bypasses GIL)
-- **Parallel Processing**: Docling conversion with process pool and memory isolation
-- **CPU Headroom**: Defaults to 80% of CPUs to keep system responsive
-- **Memory Safe**: `maxtasksperchild=1` prevents ~1GB/chunk memory leaks
+- **Smart Splitting**: Auto-selects best strategy based on document structure
+- **Bookmark-Aware**: Respects chapter/section boundaries
+- **Parallel Processing**: Process pools for chunking and Docling conversion
+- **Image Extraction**: Preserves page images and embedded figures
+- **Memory Safe**: `maxtasksperchild=1` prevents memory leaks
 
 ## Installation
 
-### Using uv (recommended)
-
 ```bash
-# Create virtual environment and install
-uv venv
-source .venv/bin/activate
-uv pip install -e ".[dev]"
+# Using uv (recommended)
+uv venv && source .venv/bin/activate && uv pip install -e ".[dev]"
+
+# Using pip
+python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 ```
 
-### Using pip
+## Usage
 
 ```bash
-# Create virtual environment and install
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-### Legacy (requirements.txt)
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-## Quick Start
-
-### CLI Usage
-
-```bash
-# Analyze a PDF's structure
-pdf-splitter analyze document.pdf
-
-# Create PDF chunks (parallel by default)
-pdf-splitter chunk document.pdf --output ./chunks
-pdf-splitter chunk document.pdf --workers 8 --output ./chunks
-
-# Convert chunks to structured documents (parallel Docling)
-pdf-splitter convert ./chunks/
-pdf-splitter convert ./chunks/ --workers 4 --output results.json
-
-# Compare all splitting strategies
-pdf-splitter compare document.pdf
-
-# Batch analyze a directory
-pdf-splitter batch ./documents/
+pdf-splitter analyze document.pdf      # Analyze structure
+pdf-splitter chunk document.pdf -o ./chunks  # Create chunks
+pdf-splitter convert ./chunks/ -o out.json   # Convert to JSON
+pdf-splitter compare document.pdf      # Compare strategies
+pdf-splitter batch ./documents/        # Batch analyze
 ```
 
 ### CLI Options
 
 ```bash
+# Common options:
+#   -v, --verbose       Enable INFO logging (default: WARNING, quiet)
+
 # Chunk options:
 #   -o, --output DIR    Output directory
 #   -s, --strategy STR  Force strategy: fixed, hybrid, enhanced
-#   -w, --workers N     Parallel write processes (default: 80% of CPUs)
+#   -w, --workers N     Parallel processes (default: 80% of CPUs)
 #   --sequential        Disable parallel writing
-#   --max-pages N       Maximum pages per chunk (default: 100)
-#   --min-pages N       Minimum pages per chunk (default: 15)
-#   --overlap N         Overlap pages between chunks (default: 0)
-#   -v, --verbose       Show [BEGIN]/[COMPLETE] lifecycle per chunk
+#   --max-pages N       Max pages per chunk (default: 100)
+#   --min-pages N       Min pages per chunk (default: 15)
 
 # Convert options:
-#   -o, --output FILE   Output JSON file for Docling results
-#   -w, --workers N     Parallel Docling processes (default: 80% of CPUs)
+#   -o, --output FILE   Output JSON file
+#   -w, --workers N     Parallel processes (default: 80% of CPUs)
 #   --maxtasks N        Tasks per worker before restart (default: 1)
-#   -v, --verbose       Show conversion details
 ```
 
-### When to Use Each Command
+### Workflow
 
-| Command | Use Case | Example |
-|---------|----------|---------|
-| `analyze` | Understand a PDF's structure before splitting | You have a 1000-page manual and want to see how it's organized (bookmarks, chapters) before deciding on chunk sizes |
-| `chunk` | Create smaller PDF files from a large document | You need to break a 500-page PDF into 50-page chunks for parallel processing or to stay within API limits |
-| `convert` | Extract structured content (text, tables) from PDFs | You have PDF chunks and need to extract their content as structured data for an LLM pipeline or search index |
-| `compare` | Evaluate different splitting strategies | You're unsure whether bookmark-based or fixed-size splitting works better for your document type |
-| `batch` | Analyze multiple PDFs at once | You have a directory of PDFs and want a quick overview of how each would be split |
-
-**Typical Workflow:**
 ```bash
-# 1. Analyze the document structure
-pdf-splitter analyze large_manual.pdf --verbose
+# 1. Analyze structure
+pdf-splitter analyze document.pdf -v
 
-# 2. Create chunks (ProcessPoolExecutor - bypasses GIL for CPU-bound pypdf)
-pdf-splitter chunk large_manual.pdf --output ./chunks --max-pages 50
+# 2. Create chunks
+pdf-splitter chunk document.pdf -o ./chunks --max-pages 50
 
-# 3. Convert chunks to structured documents (ProcessPoolExecutor with memory isolation)
-pdf-splitter convert ./chunks/ --output results.json
+# 3. Convert to structured JSON (includes images)
+pdf-splitter convert ./chunks/ -o results.json
 ```
-
-**Why Two Separate Commands?**
-- `chunk` uses **processes** for CPU-bound pypdf operations (bypasses Python GIL)
-- `convert` uses **processes** with `maxtasksperchild=1` for Docling (prevents memory leaks)
 
 ### Python API
 
@@ -115,71 +69,35 @@ pdf-splitter convert ./chunks/ --output results.json
 from src.segmentation_enhanced import smart_split, smart_split_to_files
 from src.processor import BatchProcessor
 
-# Analyze and get chunk boundaries
+# Analyze
 result = smart_split("document.pdf", max_chunk_pages=100)
 print(result.summary())
-# Strategy: auto_hybrid_chapter_l4
-# Total pages: 981
-# Chunks: 20
-# Chunk sizes: 10-101 pages (avg 49.8)
 
-# Create chunk files (parallel by default, 80% of CPUs)
-chunk_paths, result = smart_split_to_files(
-    "document.pdf",
-    output_dir="./chunks",
-    max_chunk_pages=100,
-    max_workers=8,        # override default (80% of CPUs)
-    parallel=True         # set False for sequential
-)
+# Create chunks
+chunk_paths, result = smart_split_to_files("document.pdf", output_dir="./chunks")
 
-# Convert chunks with Docling (parallel)
-processor = BatchProcessor(max_workers=4, maxtasksperchild=1)
+# Convert with Docling
+processor = BatchProcessor(max_workers=4)
 results = processor.execute_parallel(chunk_paths)
 ```
 
-## Splitting Strategies
+## Strategies
 
 | Strategy | Use Case |
 |----------|----------|
-| `single_chunk` | Small documents (< max_chunk_pages) |
-| `fixed` | No bookmarks or simple documents |
-| `hybrid` | Complex documents with chapter structure |
-| `enhanced` | Deep bookmark traversal with auto-level detection |
+| `fixed` | Simple documents, no bookmarks |
+| `hybrid` | Documents with chapter structure |
+| `enhanced` | Deep bookmark traversal |
 
-The `smart_split()` function automatically selects the best strategy.
+`smart_split()` auto-selects the best strategy.
 
-## Running Tests
+## Tests
 
 ```bash
-# Run all unit tests
-pytest tests/ -v --ignore=tests/test_integration.py
-
-# Run integration tests (requires PDFs in assets/)
-pytest tests/ -v -m integration
-
-# Run all tests
 pytest tests/ -v
-```
-
-## Project Structure
-
-```
-pdf-splitter/
-├── pyproject.toml             # Project configuration
-├── src/
-│   ├── cli.py                 # CLI implementation
-│   ├── segmentation.py        # Basic splitting
-│   ├── segmentation_enhanced.py  # Smart splitting strategies
-│   ├── config_factory.py      # Docling converter config
-│   ├── processor.py           # Parallel batch processing
-│   └── reassembly.py          # Document merging
-├── tests/                     # Test suite
-└── assets/                    # Place PDFs here
 ```
 
 ## Requirements
 
 - Python 3.10+
-- docling
-- pypdf
-- pytest (for testing)
+- docling, pypdf
