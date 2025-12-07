@@ -36,6 +36,14 @@ def _process_chunk(chunk_path: str) -> Dict[str, Any]:
         - 'document': serialized DoclingDocument (if success)
         - 'error': error message (if failed)
     """
+    # Disable automatic garbage collection to prevent GC thrashing.
+    # Docling creates millions of objects; Python's periodic GC triggers
+    # mid-conversion and gets stuck traversing the massive object graph.
+    # With maxtasksperchild=1, the process dies after one chunk anyway,
+    # so letting the OS reclaim memory is faster than Python GC.
+    import gc
+    gc.disable()
+
     # Import inside worker to ensure proper process isolation
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.datamodel.base_models import InputFormat
