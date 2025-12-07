@@ -7,8 +7,9 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 - **Smart Splitting**: Auto-selects the best strategy based on document structure
 - **Bookmark-Aware**: Respects chapter/section boundaries when available
 - **Balanced Chunks**: Ensures no single chunk dominates (prevents 1000+ page chunks)
-- **Parallel I/O**: Writes chunk files in parallel using thread pool
+- **Parallel I/O**: Writes chunk files in parallel using process pool (bypasses GIL)
 - **Parallel Processing**: Docling conversion with process pool and memory isolation
+- **CPU Headroom**: Defaults to 80% of CPUs to keep system responsive
 - **Memory Safe**: `maxtasksperchild=1` prevents ~1GB/chunk memory leaks
 
 ## Installation
@@ -68,7 +69,7 @@ pdf-splitter batch ./documents/
 # Chunk options:
 #   -o, --output DIR    Output directory
 #   -s, --strategy STR  Force strategy: fixed, hybrid, enhanced
-#   -w, --workers N     Parallel write workers (default: CPU count)
+#   -w, --workers N     Parallel write processes (default: 80% of CPUs)
 #   --sequential        Disable parallel writing
 #   --max-pages N       Maximum pages per chunk (default: 100)
 #   --min-pages N       Minimum pages per chunk (default: 15)
@@ -77,7 +78,7 @@ pdf-splitter batch ./documents/
 
 # Convert options:
 #   -o, --output FILE   Output JSON file for Docling results
-#   -w, --workers N     Parallel Docling workers (default: CPU count)
+#   -w, --workers N     Parallel Docling processes (default: 80% of CPUs)
 #   --maxtasks N        Tasks per worker before restart (default: 1)
 #   -v, --verbose       Show conversion details
 ```
@@ -97,16 +98,16 @@ pdf-splitter batch ./documents/
 # 1. Analyze the document structure
 pdf-splitter analyze large_manual.pdf --verbose
 
-# 2. Create chunks (uses ThreadPoolExecutor - single process, multiple threads)
+# 2. Create chunks (ProcessPoolExecutor - bypasses GIL for CPU-bound pypdf)
 pdf-splitter chunk large_manual.pdf --output ./chunks --max-pages 50
 
-# 3. Convert chunks to structured documents (uses ProcessPoolExecutor - multiple processes)
-pdf-splitter convert ./chunks/ --output results.json --workers 8
+# 3. Convert chunks to structured documents (ProcessPoolExecutor with memory isolation)
+pdf-splitter convert ./chunks/ --output results.json
 ```
 
 **Why Two Separate Commands?**
-- `chunk` uses **threads** for fast I/O-bound PDF writing (single Python process)
-- `convert` uses **processes** for CPU-bound Docling extraction (multiple Python processes with memory isolation)
+- `chunk` uses **processes** for CPU-bound pypdf operations (bypasses Python GIL)
+- `convert` uses **processes** with `maxtasksperchild=1` for Docling (prevents memory leaks)
 
 ### Python API
 
@@ -122,12 +123,12 @@ print(result.summary())
 # Chunks: 20
 # Chunk sizes: 10-101 pages (avg 49.8)
 
-# Create chunk files (parallel by default)
+# Create chunk files (parallel by default, 80% of CPUs)
 chunk_paths, result = smart_split_to_files(
     "document.pdf",
     output_dir="./chunks",
     max_chunk_pages=100,
-    max_workers=8,        # parallel write workers
+    max_workers=8,        # override default (80% of CPUs)
     parallel=True         # set False for sequential
 )
 

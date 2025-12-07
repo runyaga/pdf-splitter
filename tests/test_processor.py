@@ -15,12 +15,13 @@ class TestBatchProcessor:
     """Tests for BatchProcessor class."""
 
     def test_init_default_workers(self):
-        """Test default worker count uses CPU count."""
+        """Test default worker count uses 80% of CPU count."""
         from src.processor import BatchProcessor
         import os
 
         processor = BatchProcessor()
-        assert processor.max_workers == os.cpu_count()
+        expected_workers = max(1, int((os.cpu_count() or 4) * 0.8))
+        assert processor.max_workers == expected_workers
         assert processor.maxtasksperchild == 1
 
     def test_init_custom_workers(self):
