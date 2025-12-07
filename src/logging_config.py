@@ -72,8 +72,12 @@ def setup_logging(
     pkg_logger = logging.getLogger(PACKAGE_NAME)
     pkg_logger.setLevel(level)
 
+    # Set all relevant loggers to the same level for consistency
+    for logger_name in ['docling', 'docling_core', 'docling_parse']:
+        logging.getLogger(logger_name).setLevel(level)
+
     if verbose:
-        pkg_logger.info("Verbose logging enabled")
+        pkg_logger.debug("Verbose logging enabled")
 
 
 def get_logger(name: str) -> logging.Logger:

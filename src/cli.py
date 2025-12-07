@@ -168,7 +168,8 @@ def cmd_convert(args):
     # Create processor
     processor = BatchProcessor(
         max_workers=args.workers,
-        maxtasksperchild=args.maxtasks
+        maxtasksperchild=args.maxtasks,
+        verbose=args.verbose
     )
 
     # Process chunks

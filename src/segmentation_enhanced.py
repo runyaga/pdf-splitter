@@ -258,10 +258,14 @@ def _write_single_chunk(
     try:
         reader = PdfReader(reader_path)
         writer = PdfWriter()
-        num_pages = end - start
 
         for page_num in range(start, end):
-            writer.add_page(reader.pages[page_num])
+            page = reader.pages[page_num]
+            # Remove annotations (links, bookmarks) to avoid slow _resolve_links
+            # during write. Docling doesn't need internal PDF links.
+            if "/Annots" in page:
+                del page["/Annots"]
+            writer.add_page(page)
 
         chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
         chunk_path = Path(output_dir_str) / chunk_filename
@@ -303,7 +307,7 @@ def smart_split_to_files(
         Tuple of (list of chunk file paths, SplitResult metadata)
     """
     pdf_path = Path(pdf_path)
-    logger.info(f"Starting smart split: {pdf_path.name}")
+    logger.debug(f"Starting smart split: {pdf_path.name}")
 
     # Get split boundaries
     result = smart_split(
@@ -339,7 +343,7 @@ def smart_split_to_files(
             pdf_path, result.boundaries, output_dir, total_chunks
         )
 
-    logger.info(f"Split complete: {total_chunks} chunks written to {output_dir}")
+    logger.debug(f"Split complete: {total_chunks} chunks written to {output_dir}")
     return chunk_paths, result
 
 
@@ -356,10 +360,7 @@ def _write_chunks_parallel(
     CPU-bound. The GIL would serialize thread execution, making ThreadPoolExecutor
     ineffective. ProcessPoolExecutor bypasses the GIL for true parallelism.
     """
-    logger.info(
-        f"Parallel chunk writing: {max_workers} processes"
-    )
-    logger.info(f"Beginning parallel write of {total_chunks} chunks")
+    logger.debug(f"Parallel chunk writing: {max_workers} processes, {total_chunks} chunks")
 
     chunk_paths = [None] * total_chunks
     completed_count = 0
@@ -397,7 +398,7 @@ def _write_chunks_parallel(
             else:
                 chunk_path = Path(chunk_path_str)
                 chunk_paths[idx] = chunk_path
-                logger.info(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
+                logger.debug(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
 
         # Clear futures to release references before shutdown
         futures.clear()
@@ -410,7 +411,7 @@ def _write_chunks_parallel(
 
     success_count = len(valid_paths)
     fail_count = total_chunks - success_count
-    logger.info(f"Parallel write complete: {success_count} succeeded, {fail_count} failed")
+    logger.debug(f"Parallel write complete: {success_count} succeeded, {fail_count} failed")
 
     return valid_paths
 
@@ -422,19 +423,23 @@ def _write_chunks_sequential(
     total_chunks: int
 ) -> List[Path]:
     """Write chunks sequentially (original behavior)."""
-    logger.info(f"Sequential chunk writing: {total_chunks} chunks")
+    logger.debug(f"Sequential chunk writing: {total_chunks} chunks")
 
     reader = PdfReader(str(pdf_path))
     chunk_paths = []
 
-    logger.info(f"Writing {total_chunks} chunks sequentially")
+    logger.debug(f"Writing {total_chunks} chunks sequentially")
 
     for idx, (start, end) in enumerate(boundaries):
         writer = PdfWriter()
         num_pages = end - start
 
         for page_num in range(start, end):
-            writer.add_page(reader.pages[page_num])
+            page = reader.pages[page_num]
+            # Remove annotations to avoid slow _resolve_links during write
+            if "/Annots" in page:
+                del page["/Annots"]
+            writer.add_page(page)
 
         chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
@@ -445,7 +450,7 @@ def _write_chunks_sequential(
 
         chunk_paths.append(chunk_path)
         logger.debug(f"[COMPLETE] Chunk {idx+1}/{total_chunks}: {chunk_filename}")
-        logger.info(f"Wrote chunk {idx+1}/{total_chunks}: {chunk_filename}")
+        logger.debug(f"Wrote chunk {idx+1}/{total_chunks}: {chunk_filename}")
 
     return chunk_paths
 

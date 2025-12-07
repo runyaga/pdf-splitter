@@ -19,7 +19,7 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def _process_chunk(chunk_path: str) -> Dict[str, Any]:
+def _process_chunk(chunk_path: str, verbose: bool = False) -> Dict[str, Any]:
     """
     Worker function to process a single PDF chunk.
 
@@ -28,6 +28,7 @@ def _process_chunk(chunk_path: str) -> Dict[str, Any]:
 
     Args:
         chunk_path: Path to the chunk PDF file
+        verbose: If True, enable INFO logging; if False, WARNING only
 
     Returns:
         Dict containing:
@@ -43,6 +44,13 @@ def _process_chunk(chunk_path: str) -> Dict[str, Any]:
     # so letting the OS reclaim memory is faster than Python GC.
     import gc
     gc.disable()
+
+    # Configure logging in worker process based on verbose flag
+    import logging
+    level = logging.INFO if verbose else logging.WARNING
+    logging.basicConfig(level=level, force=True)
+    for logger_name in ['docling', 'docling_core', 'docling_parse', 'src']:
+        logging.getLogger(logger_name).setLevel(level)
 
     # Import inside worker to ensure proper process isolation
     from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -101,7 +109,8 @@ class BatchProcessor:
     def __init__(
         self,
         max_workers: Optional[int] = None,
-        maxtasksperchild: int = 1
+        maxtasksperchild: int = 1,
+        verbose: bool = False
     ):
         """
         Initialize the batch processor.
@@ -109,10 +118,12 @@ class BatchProcessor:
         Args:
             max_workers: Maximum parallel workers (defaults to CPU count)
             maxtasksperchild: Tasks per worker before restart (default 1 for memory isolation)
+            verbose: If True, enable INFO logging in workers; if False, WARNING only
         """
         # Default to 80% of CPUs to leave headroom for other processes
         self.max_workers = max_workers or max(1, int((os.cpu_count() or 4) * 0.8))
         self.maxtasksperchild = maxtasksperchild
+        self.verbose = verbose
 
     def execute_parallel(
         self,
@@ -136,17 +147,9 @@ class BatchProcessor:
         results = [None] * len(chunk_paths)
         path_to_idx = {p: i for i, p in enumerate(chunk_str_paths)}
 
-        # Log configuration at INFO level so it's always visible
-        logger.info(
-            f"Parallel processing configuration: "
-            f"max_workers={self.max_workers}, maxtasksperchild={self.maxtasksperchild}"
-        )
-        logger.info(
-            f"Beginning parallel processing of {len(chunk_paths)} chunks"
-        )
         logger.debug(
-            f"Process isolation enabled: each worker processes 1 task then restarts "
-            f"(prevents ~1GB/chunk memory leak)"
+            f"Parallel processing: max_workers={self.max_workers}, "
+            f"maxtasksperchild={self.maxtasksperchild}, chunks={len(chunk_paths)}"
         )
 
         completed_count = 0
@@ -159,7 +162,7 @@ class BatchProcessor:
             for path in chunk_str_paths:
                 idx = path_to_idx[path]
                 logger.debug(f"[BEGIN] Submitting chunk {idx + 1}/{len(chunk_paths)}: {Path(path).name}")
-                future = executor.submit(_process_chunk, path)
+                future = executor.submit(_process_chunk, path, self.verbose)
                 future_to_path[future] = path
 
             logger.debug(f"All {len(chunk_paths)} chunks submitted to worker pool")
@@ -176,10 +179,7 @@ class BatchProcessor:
                     completed_count += 1
 
                     if result['success']:
-                        logger.debug(f"[COMPLETE] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name}")
-                        logger.info(
-                            f"Processed {completed_count}/{len(chunk_paths)}: {chunk_name}"
-                        )
+                        logger.debug(f"Processed {completed_count}/{len(chunk_paths)}: {chunk_name}")
                     else:
                         logger.error(
                             f"[FAILED] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {result['error']}"
@@ -197,9 +197,7 @@ class BatchProcessor:
         # Summary
         success_count = sum(1 for r in results if r and r.get('success'))
         fail_count = len(chunk_paths) - success_count
-        logger.info(
-            f"Parallel processing complete: {success_count} succeeded, {fail_count} failed"
-        )
+        logger.debug(f"Processing complete: {success_count} succeeded, {fail_count} failed")
 
         return results if ordered else [r for r in results if r is not None]
 
@@ -215,8 +213,8 @@ class BatchProcessor:
         """
         results = []
         for i, chunk_path in enumerate(chunk_paths):
-            logger.info(f"Processing chunk {i + 1}/{len(chunk_paths)}: {chunk_path}")
-            result = _process_chunk(str(chunk_path))
+            logger.debug(f"Processing chunk {i + 1}/{len(chunk_paths)}: {chunk_path}")
+            result = _process_chunk(str(chunk_path), self.verbose)
             results.append(result)
 
             if not result['success']:

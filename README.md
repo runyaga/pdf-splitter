@@ -8,7 +8,8 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 - **Bookmark-Aware**: Respects chapter/section boundaries
 - **Parallel Processing**: Process pools for chunking and Docling conversion
 - **Image Extraction**: Preserves page images and embedded figures
-- **Memory Safe**: `maxtasksperchild=1` prevents memory leaks
+- **Memory Safe**: Process isolation prevents memory leaks
+- **Fast Chunking**: Strips annotations to avoid pypdf link resolution overhead
 
 ## Installation
 
@@ -35,7 +36,7 @@ pdf-splitter batch ./documents/             # Batch analyze
 
 ```bash
 # Common options:
-#   -v, --verbose       Enable INFO logging (default: WARNING, quiet)
+#   -v, --verbose       Enable INFO logging for all loggers (default: WARNING)
 
 # Chunk options:
 #   -o, --output DIR    Output directory
@@ -77,7 +78,7 @@ print(result.summary())
 chunk_paths, result = smart_split_to_files("document.pdf", output_dir="./chunks")
 
 # Convert with Docling
-processor = BatchProcessor(max_workers=4)
+processor = BatchProcessor(max_workers=4, verbose=True)
 results = processor.execute_parallel(chunk_paths)
 ```
 
