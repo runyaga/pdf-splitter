@@ -281,6 +281,118 @@ class TestSmartSplitToFiles:
         chunk_paths[0].parent.rmdir()
 
 
+class TestParallelChunkWriting:
+    """Tests for parallel chunk writing functionality."""
+
+    @pytest.fixture
+    def test_pdf(self):
+        """Create a test PDF with 100 pages."""
+        from pypdf import PdfWriter
+
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+            writer = PdfWriter()
+            for _ in range(100):
+                writer.add_blank_page(width=612, height=792)
+            writer.write(f)
+            pdf_path = Path(f.name)
+
+        yield pdf_path
+        pdf_path.unlink(missing_ok=True)
+
+    def test_parallel_creates_same_chunks_as_sequential(self, test_pdf):
+        """Test that parallel and sequential produce same results."""
+        from src.segmentation_enhanced import smart_split_to_files
+        from pypdf import PdfReader
+
+        with tempfile.TemporaryDirectory() as tmpdir1, \
+             tempfile.TemporaryDirectory() as tmpdir2:
+
+            # Parallel
+            parallel_paths, parallel_result = smart_split_to_files(
+                test_pdf, Path(tmpdir1), max_chunk_pages=25, parallel=True
+            )
+
+            # Sequential
+            seq_paths, seq_result = smart_split_to_files(
+                test_pdf, Path(tmpdir2), max_chunk_pages=25, parallel=False
+            )
+
+            # Same number of chunks
+            assert len(parallel_paths) == len(seq_paths)
+
+            # Same page counts in each chunk
+            for p_path, s_path in zip(sorted(parallel_paths), sorted(seq_paths)):
+                p_reader = PdfReader(str(p_path))
+                s_reader = PdfReader(str(s_path))
+                assert len(p_reader.pages) == len(s_reader.pages)
+
+    def test_parallel_with_custom_workers(self, test_pdf):
+        """Test parallel writing with custom worker count."""
+        from src.segmentation_enhanced import smart_split_to_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk_paths, result = smart_split_to_files(
+                test_pdf, Path(tmpdir),
+                max_chunk_pages=20,
+                max_workers=2,
+                parallel=True
+            )
+
+            assert len(chunk_paths) >= 5
+            for path in chunk_paths:
+                assert path.exists()
+
+    def test_sequential_mode_explicit(self, test_pdf):
+        """Test explicit sequential mode."""
+        from src.segmentation_enhanced import smart_split_to_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk_paths, result = smart_split_to_files(
+                test_pdf, Path(tmpdir),
+                max_chunk_pages=25,
+                parallel=False
+            )
+
+            assert len(chunk_paths) >= 4
+            for path in chunk_paths:
+                assert path.exists()
+
+    def test_single_chunk_uses_sequential(self, test_pdf):
+        """Test that single chunk doesn't use parallel (no benefit)."""
+        from src.segmentation_enhanced import smart_split_to_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 100 pages, max 200 = single chunk
+            chunk_paths, result = smart_split_to_files(
+                test_pdf, Path(tmpdir),
+                max_chunk_pages=200,
+                parallel=True
+            )
+
+            assert len(chunk_paths) == 1
+            assert result.num_chunks == 1
+
+    def test_parallel_maintains_order(self, test_pdf):
+        """Test that parallel writing maintains chunk order."""
+        from src.segmentation_enhanced import smart_split_to_files
+        from pypdf import PdfReader
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk_paths, result = smart_split_to_files(
+                test_pdf, Path(tmpdir),
+                max_chunk_pages=20,
+                parallel=True
+            )
+
+            # Verify chunks are named in order and have expected pages
+            for i, (path, (start, end)) in enumerate(zip(chunk_paths, result.boundaries)):
+                expected_name = f"chunk_{i:04d}_pages_{start+1:04d}_{end:04d}.pdf"
+                assert path.name == expected_name
+
+                reader = PdfReader(str(path))
+                assert len(reader.pages) == end - start
+
+
 class TestSmartSplitOnRealPDFs:
     """Integration tests using PDFs from assets folder."""
 

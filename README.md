@@ -7,8 +7,9 @@ A scalable PDF splitting framework for parallel document processing using Doclin
 - **Smart Splitting**: Auto-selects the best strategy based on document structure
 - **Bookmark-Aware**: Respects chapter/section boundaries when available
 - **Balanced Chunks**: Ensures no single chunk dominates (prevents 1000+ page chunks)
-- **Parallel Processing**: Designed for use with Docling's parallel document conversion
-- **Memory Safe**: Process isolation prevents memory leaks in long-running jobs
+- **Parallel I/O**: Writes chunk files in parallel using thread pool
+- **Parallel Processing**: Docling conversion with process pool and memory isolation
+- **Memory Safe**: `maxtasksperchild=1` prevents ~1GB/chunk memory leaks
 
 ## Installation
 
@@ -46,8 +47,13 @@ pip install -r requirements.txt
 # Analyze a PDF's structure
 pdf-splitter analyze document.pdf
 
-# Split a PDF into chunks
+# Split a PDF into chunks (parallel by default)
 pdf-splitter split document.pdf --output ./chunks
+pdf-splitter split document.pdf --workers 8 --output ./chunks
+
+# Process chunks with Docling (parallel)
+pdf-splitter process ./chunks/
+pdf-splitter process ./chunks/ --workers 4 --output results.json
 
 # Compare all splitting strategies
 pdf-splitter compare document.pdf
@@ -59,23 +65,28 @@ pdf-splitter batch ./documents/
 ### CLI Options
 
 ```bash
-pdf-splitter split --help
+# Split options:
+#   -o, --output DIR    Output directory
+#   -s, --strategy STR  Force strategy: fixed, hybrid, enhanced
+#   -w, --workers N     Parallel write workers (default: CPU count)
+#   --sequential        Disable parallel writing
+#   --max-pages N       Maximum pages per chunk (default: 100)
+#   --min-pages N       Minimum pages per chunk (default: 15)
+#   --overlap N         Overlap pages between chunks (default: 0)
+#   -v, --verbose       Show [BEGIN]/[COMPLETE] lifecycle per chunk
 
-# Options (available on all subcommands):
-#   --max-pages N    Maximum pages per chunk (default: 100)
-#   --min-pages N    Minimum pages per chunk (default: 15)
-#   --overlap N      Overlap pages between chunks (default: 5)
-#   -v, --verbose    Show detailed progress (chunk writes, strategy decisions)
-
-# Split-specific options:
-#   -o, --output     Output directory
-#   -s, --strategy   Force strategy: fixed, hybrid, enhanced
+# Process options:
+#   -o, --output FILE   Output JSON file for Docling results
+#   -w, --workers N     Parallel Docling workers (default: CPU count)
+#   --maxtasks N        Tasks per worker before restart (default: 1)
+#   -v, --verbose       Show processing details
 ```
 
 ### Python API
 
 ```python
 from src.segmentation_enhanced import smart_split, smart_split_to_files
+from src.processor import BatchProcessor
 
 # Analyze and get split boundaries
 result = smart_split("document.pdf", max_chunk_pages=100)
@@ -85,12 +96,18 @@ print(result.summary())
 # Chunks: 20
 # Chunk sizes: 10-101 pages (avg 49.8)
 
-# Split to files
+# Split to files (parallel by default)
 chunk_paths, result = smart_split_to_files(
     "document.pdf",
     output_dir="./chunks",
-    max_chunk_pages=100
+    max_chunk_pages=100,
+    max_workers=8,        # parallel write workers
+    parallel=True         # set False for sequential
 )
+
+# Process chunks with Docling (parallel)
+processor = BatchProcessor(max_workers=4, maxtasksperchild=1)
+results = processor.execute_parallel(chunk_paths)
 ```
 
 ## Splitting Strategies

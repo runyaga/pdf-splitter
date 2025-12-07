@@ -96,6 +96,15 @@ def cmd_split(args):
     if output_dir:
         print(f"Output directory: {output_dir}")
 
+    # Determine parallelism
+    parallel = not args.sequential
+    max_workers = args.workers
+
+    if parallel:
+        print(f"Parallel writing: enabled (workers: {max_workers or 'auto'})")
+    else:
+        print(f"Parallel writing: disabled (sequential mode)")
+
     # Perform split
     chunk_paths, result = smart_split_to_files(
         pdf_path,
@@ -103,7 +112,9 @@ def cmd_split(args):
         max_chunk_pages=args.max_pages,
         min_chunk_pages=args.min_pages,
         overlap=args.overlap,
-        force_strategy=args.strategy
+        force_strategy=args.strategy,
+        max_workers=max_workers,
+        parallel=parallel
     )
 
     print(f"\n{result.summary()}")
@@ -123,6 +134,88 @@ def cmd_split(args):
     print(f"Total size: {total_size/1024:.2f} MB")
 
     return 0
+
+
+def cmd_process(args):
+    """Process PDF chunks with Docling in parallel."""
+    from src.processor import BatchProcessor
+
+    # Gather chunk files
+    input_path = Path(args.input)
+    if input_path.is_file():
+        chunk_paths = [input_path]
+    elif input_path.is_dir():
+        chunk_paths = sorted(input_path.glob("*.pdf"))
+        if not chunk_paths:
+            print(f"Error: No PDF files found in {input_path}", file=sys.stderr)
+            return 1
+    else:
+        print(f"Error: Path not found: {input_path}", file=sys.stderr)
+        return 1
+
+    print(f"{'='*70}")
+    print(f"DOCLING PARALLEL PROCESSING")
+    print(f"{'='*70}")
+    print(f"Input: {input_path}")
+    print(f"Chunks to process: {len(chunk_paths)}")
+    print(f"Workers: {args.workers or 'auto (CPU count)'}")
+    print(f"Tasks per worker: {args.maxtasks}")
+    print()
+
+    # Create processor
+    processor = BatchProcessor(
+        max_workers=args.workers,
+        maxtasksperchild=args.maxtasks
+    )
+
+    # Process chunks
+    results = processor.execute_parallel(chunk_paths)
+
+    # Summary
+    success_count = sum(1 for r in results if r and r.get('success'))
+    fail_count = len(results) - success_count
+
+    print(f"\n{'='*70}")
+    print(f"PROCESSING COMPLETE")
+    print(f"{'='*70}")
+    print(f"Total chunks: {len(results)}")
+    print(f"Succeeded: {success_count}")
+    print(f"Failed: {fail_count}")
+
+    if args.verbose:
+        print(f"\nResults:")
+        for r in results:
+            if r:
+                status = "OK" if r['success'] else f"FAIL: {r['error']}"
+                print(f"  {Path(r['chunk_path']).name}: {status}")
+
+    # Output results if requested
+    if args.output:
+        import json
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Serialize results (document dicts can be large)
+        output_data = []
+        for r in results:
+            if r and r['success']:
+                output_data.append({
+                    'chunk_path': r['chunk_path'],
+                    'success': True,
+                    'document_dict': r['document_dict']
+                })
+            elif r:
+                output_data.append({
+                    'chunk_path': r['chunk_path'],
+                    'success': False,
+                    'error': r['error']
+                })
+
+        with open(output_path, 'w') as f:
+            json.dump(output_data, f, indent=2)
+        print(f"\nResults written to: {output_path}")
+
+    return 0 if fail_count == 0 else 1
 
 
 def cmd_compare(args):
@@ -251,9 +344,15 @@ Examples:
     pdf-splitter analyze document.pdf
     pdf-splitter analyze document.pdf --verbose
 
-  Split a PDF:
+  Split a PDF (parallel writing by default):
     pdf-splitter split document.pdf --output ./chunks
-    pdf-splitter split document.pdf --max-pages 50 --strategy fixed
+    pdf-splitter split document.pdf --max-pages 50 --workers 8
+    pdf-splitter split document.pdf --sequential  # disable parallel
+
+  Process chunks with Docling (parallel):
+    pdf-splitter process ./chunks/
+    pdf-splitter process ./chunks/ --workers 4 --output results.json
+    pdf-splitter process ./chunks/ --maxtasks 2 -v
 
   Compare strategies:
     pdf-splitter compare document.pdf
@@ -277,8 +376,24 @@ Examples:
     p_split.add_argument("-o", "--output", help="Output directory")
     p_split.add_argument("-s", "--strategy", choices=["fixed", "hybrid", "enhanced"],
                          help="Force specific strategy")
+    p_split.add_argument("-w", "--workers", type=int, default=None,
+                         help="Number of parallel workers for writing (default: CPU count)")
+    p_split.add_argument("--sequential", action="store_true",
+                         help="Disable parallel writing (use sequential mode)")
     _add_common_options(p_split)
     p_split.set_defaults(func=cmd_split)
+
+    # process command
+    p_process = subparsers.add_parser("process", help="Process chunks with Docling in parallel")
+    p_process.add_argument("input", help="Path to chunk PDF or directory of chunks")
+    p_process.add_argument("-o", "--output", help="Output JSON file for results")
+    p_process.add_argument("-w", "--workers", type=int, default=None,
+                           help="Number of parallel workers (default: CPU count)")
+    p_process.add_argument("--maxtasks", type=int, default=1,
+                           help="Tasks per worker before restart (default: 1 for memory isolation)")
+    p_process.add_argument("-v", "--verbose", action="store_true",
+                           help="Verbose output")
+    p_process.set_defaults(func=cmd_process)
 
     # compare command
     p_compare = subparsers.add_parser("compare", help="Compare splitting strategies")

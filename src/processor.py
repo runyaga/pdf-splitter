@@ -127,43 +127,70 @@ class BatchProcessor:
         results = [None] * len(chunk_paths)
         path_to_idx = {p: i for i, p in enumerate(chunk_str_paths)}
 
+        # Log configuration at INFO level so it's always visible
         logger.info(
-            f"Starting parallel processing of {len(chunk_paths)} chunks "
-            f"with {self.max_workers} workers (maxtasksperchild={self.maxtasksperchild})"
+            f"Parallel processing configuration: "
+            f"max_workers={self.max_workers}, maxtasksperchild={self.maxtasksperchild}"
+        )
+        logger.info(
+            f"Beginning parallel processing of {len(chunk_paths)} chunks"
+        )
+        logger.debug(
+            f"Process isolation enabled: each worker processes 1 task then restarts "
+            f"(prevents ~1GB/chunk memory leak)"
         )
 
+        completed_count = 0
         with ProcessPoolExecutor(
             max_workers=self.max_workers,
             max_tasks_per_child=self.maxtasksperchild
         ) as executor:
             # Submit all chunks
-            future_to_path = {
-                executor.submit(_process_chunk, path): path
-                for path in chunk_str_paths
-            }
+            future_to_path = {}
+            for path in chunk_str_paths:
+                idx = path_to_idx[path]
+                logger.debug(f"[BEGIN] Submitting chunk {idx + 1}/{len(chunk_paths)}: {Path(path).name}")
+                future = executor.submit(_process_chunk, path)
+                future_to_path[future] = path
+
+            logger.debug(f"All {len(chunk_paths)} chunks submitted to worker pool")
 
             # Collect results as they complete
             for future in as_completed(future_to_path):
                 path = future_to_path[future]
                 idx = path_to_idx[path]
+                chunk_name = Path(path).name
 
                 try:
                     result = future.result()
                     results[idx] = result
+                    completed_count += 1
 
                     if result['success']:
-                        logger.info(f"Processed chunk {idx + 1}/{len(chunk_paths)}: {path}")
+                        logger.debug(f"[COMPLETE] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name}")
+                        logger.info(
+                            f"Processed {completed_count}/{len(chunk_paths)}: {chunk_name}"
+                        )
                     else:
-                        logger.error(f"Failed chunk {idx + 1}/{len(chunk_paths)}: {result['error']}")
+                        logger.error(
+                            f"[FAILED] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {result['error']}"
+                        )
 
                 except Exception as e:
-                    logger.error(f"Exception processing {path}: {e}")
+                    logger.error(f"[EXCEPTION] Chunk {idx + 1}/{len(chunk_paths)}: {chunk_name} - {e}")
                     results[idx] = {
                         'success': False,
                         'chunk_path': path,
                         'document_dict': None,
                         'error': str(e)
                     }
+
+        # Summary
+        success_count = sum(1 for r in results if r and r.get('success'))
+        fail_count = len(chunk_paths) - success_count
+        logger.info(
+            f"Parallel processing complete: {success_count} succeeded, {fail_count} failed"
+        )
 
         return results if ordered else [r for r in results if r is not None]
 

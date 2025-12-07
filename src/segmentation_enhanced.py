@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 from pypdf import PdfReader, PdfWriter
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import tempfile
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -226,6 +228,51 @@ def _check_overlap(boundaries: List[Tuple[int, int]]) -> bool:
     return False
 
 
+def _write_single_chunk(
+    reader_path: str,
+    start: int,
+    end: int,
+    idx: int,
+    total_chunks: int,
+    output_dir: Path
+) -> Tuple[int, Path, Optional[str]]:
+    """
+    Write a single chunk to disk. Designed for parallel execution.
+
+    Args:
+        reader_path: Path to the source PDF (string for pickling)
+        start: Start page (0-indexed)
+        end: End page (exclusive)
+        idx: Chunk index
+        total_chunks: Total number of chunks
+        output_dir: Output directory
+
+    Returns:
+        Tuple of (idx, chunk_path, error_message or None)
+    """
+    try:
+        reader = PdfReader(reader_path)
+        writer = PdfWriter()
+        num_pages = end - start
+
+        for page_num in range(start, end):
+            writer.add_page(reader.pages[page_num])
+
+        chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
+        chunk_path = output_dir / chunk_filename
+
+        logger.debug(f"[BEGIN] Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
+        with open(chunk_path, "wb") as f:
+            writer.write(f)
+
+        logger.debug(f"[COMPLETE] Chunk {idx+1}/{total_chunks}: {chunk_filename}")
+        return (idx, chunk_path, None)
+
+    except Exception as e:
+        logger.error(f"[FAILED] Chunk {idx+1}/{total_chunks}: {e}")
+        return (idx, None, str(e))
+
+
 def smart_split_to_files(
     pdf_path: Path,
     output_dir: Optional[Path] = None,
@@ -233,6 +280,8 @@ def smart_split_to_files(
     min_chunk_pages: int = 15,
     overlap: int = DEFAULT_OVERLAP,
     force_strategy: Optional[str] = None,
+    max_workers: Optional[int] = None,
+    parallel: bool = True,
 ) -> Tuple[List[Path], SplitResult]:
     """
     Split a PDF into chunk files using smart strategy selection.
@@ -244,6 +293,8 @@ def smart_split_to_files(
         min_chunk_pages: Minimum pages per chunk
         overlap: Overlap pages between chunks
         force_strategy: Force a specific strategy
+        max_workers: Maximum parallel workers for writing (defaults to CPU count)
+        parallel: If True, write chunks in parallel; if False, write sequentially
 
     Returns:
         Tuple of (list of chunk file paths, SplitResult metadata)
@@ -269,14 +320,95 @@ def smart_split_to_files(
         output_dir.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Using output directory: {output_dir}")
 
-    # Split PDF
-    reader = PdfReader(str(pdf_path))
-    chunk_paths = []
     total_chunks = len(result.boundaries)
 
-    logger.info(f"Writing {total_chunks} chunks using strategy '{result.strategy}'")
+    # Determine worker count
+    if max_workers is None:
+        max_workers = min(os.cpu_count() or 4, total_chunks)
 
-    for idx, (start, end) in enumerate(result.boundaries):
+    if parallel and total_chunks > 1:
+        chunk_paths = _write_chunks_parallel(
+            pdf_path, result.boundaries, output_dir, max_workers, total_chunks
+        )
+    else:
+        chunk_paths = _write_chunks_sequential(
+            pdf_path, result.boundaries, output_dir, total_chunks
+        )
+
+    logger.info(f"Split complete: {total_chunks} chunks written to {output_dir}")
+    return chunk_paths, result
+
+
+def _write_chunks_parallel(
+    pdf_path: Path,
+    boundaries: List[Tuple[int, int]],
+    output_dir: Path,
+    max_workers: int,
+    total_chunks: int
+) -> List[Path]:
+    """Write chunks in parallel using ThreadPoolExecutor."""
+    logger.info(
+        f"Parallel chunk writing configuration: max_workers={max_workers}"
+    )
+    logger.info(f"Beginning parallel write of {total_chunks} chunks")
+
+    chunk_paths = [None] * total_chunks
+    completed_count = 0
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all chunk writes
+        futures = {}
+        for idx, (start, end) in enumerate(boundaries):
+            logger.debug(f"[BEGIN] Submitting chunk {idx+1}/{total_chunks} to write pool")
+            future = executor.submit(
+                _write_single_chunk,
+                str(pdf_path),
+                start,
+                end,
+                idx,
+                total_chunks,
+                output_dir
+            )
+            futures[future] = idx
+
+        logger.debug(f"All {total_chunks} chunks submitted to write pool")
+
+        # Collect results as they complete
+        for future in as_completed(futures):
+            idx, chunk_path, error = future.result()
+            completed_count += 1
+
+            if error:
+                logger.error(f"Failed to write chunk {idx+1}: {error}")
+            else:
+                chunk_paths[idx] = chunk_path
+                logger.info(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
+
+    # Filter out any failed chunks
+    valid_paths = [p for p in chunk_paths if p is not None]
+
+    success_count = len(valid_paths)
+    fail_count = total_chunks - success_count
+    logger.info(f"Parallel write complete: {success_count} succeeded, {fail_count} failed")
+
+    return valid_paths
+
+
+def _write_chunks_sequential(
+    pdf_path: Path,
+    boundaries: List[Tuple[int, int]],
+    output_dir: Path,
+    total_chunks: int
+) -> List[Path]:
+    """Write chunks sequentially (original behavior)."""
+    logger.info(f"Sequential chunk writing: {total_chunks} chunks")
+
+    reader = PdfReader(str(pdf_path))
+    chunk_paths = []
+
+    logger.info(f"Writing {total_chunks} chunks sequentially")
+
+    for idx, (start, end) in enumerate(boundaries):
         writer = PdfWriter()
         num_pages = end - start
 
@@ -286,15 +418,15 @@ def smart_split_to_files(
         chunk_filename = f"chunk_{idx:04d}_pages_{start+1:04d}_{end:04d}.pdf"
         chunk_path = output_dir / chunk_filename
 
-        logger.debug(f"Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
+        logger.debug(f"[BEGIN] Writing chunk {idx+1}/{total_chunks}: pages {start+1}-{end} ({num_pages} pages)")
         with open(chunk_path, "wb") as f:
             writer.write(f)
 
         chunk_paths.append(chunk_path)
+        logger.debug(f"[COMPLETE] Chunk {idx+1}/{total_chunks}: {chunk_filename}")
         logger.info(f"Wrote chunk {idx+1}/{total_chunks}: {chunk_filename}")
 
-    logger.info(f"Split complete: {total_chunks} chunks written to {output_dir}")
-    return chunk_paths, result
+    return chunk_paths
 
 
 def get_split_boundaries_enhanced(
