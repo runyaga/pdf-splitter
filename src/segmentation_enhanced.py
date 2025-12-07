@@ -923,11 +923,14 @@ def _merge_and_split_boundaries(
             accumulated_end = end
 
             # Flush if accumulated enough
-            if accumulated_end is not None and accumulated_start is not None:
-                if accumulated_end - accumulated_start >= min_pages:
-                    result.append((accumulated_start, accumulated_end))
-                    accumulated_start = None
-                    accumulated_end = None
+            if (
+                accumulated_end is not None
+                and accumulated_start is not None
+                and accumulated_end - accumulated_start >= min_pages
+            ):
+                result.append((accumulated_start, accumulated_end))
+                accumulated_start = None
+                accumulated_end = None
         else:
             # Flush accumulated
             if accumulated_start is not None and accumulated_end is not None:

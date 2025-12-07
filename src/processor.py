@@ -191,7 +191,7 @@ class BatchProcessor:
 
         # Filter out None values for return
         valid_results: list[dict[str, Any]] = [r for r in results if r is not None]
-        return valid_results if ordered else valid_results
+        return valid_results
 
     def execute_sequential(self, chunk_paths: list[Path]) -> list[dict[str, Any]]:
         """
