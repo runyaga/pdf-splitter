@@ -1,87 +1,78 @@
 # PDF Splitter
 
-A scalable PDF splitting framework for parallel document processing using Docling. Intelligently splits large PDFs into balanced chunks while respecting document structure (chapters, sections, bookmarks).
+[![CI](https://github.com/runyaga/pdf-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/runyaga/pdf-splitter/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/runyaga/pdf-splitter/branch/main/graph/badge.svg)](https://codecov.io/gh/runyaga/pdf-splitter)
+
+A Split-Process-Merge pipeline for converting large PDFs to Docling documents. Splits PDFs into balanced chunks, processes them in parallel with Docling, then merges results into a single validated document.
 
 ## Features
 
-- **Smart Splitting**: Auto-selects best strategy based on document structure
-- **Bookmark-Aware**: Respects chapter/section boundaries
-- **Parallel Processing**: Process pools for chunking and Docling conversion
-- **Document Merging**: Custom concatenation with full reference integrity
-- **Image Extraction**: Preserves page images and embedded figures
-- **Memory Safe**: Process isolation prevents memory leaks
-- **Fast Chunking**: Strips annotations to avoid pypdf link resolution overhead
+- **Smart Splitting**: Auto-selects strategy based on document structure (bookmarks, chapters)
+- **Parallel Processing**: Process pools for both chunking and Docling conversion
+- **Document Merging**: Reassembles chunks into unified Docling document with reference integrity
+- **Validation**: Verifies page coverage, provenance monotonicity, and chunk alignment
+- **Memory Safe**: Process isolation prevents memory leaks on large documents
 
 ## Installation
 
 ```bash
-# Using uv (recommended)
-uv venv && source .venv/bin/activate && uv pip install -e ".[dev]"
-
-# Using pip
-python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
 ```
 
-## Usage
+## Quick Start
 
 ```bash
-pdf-splitter analyze document.pdf           # Analyze structure
-pdf-splitter chunk document.pdf -o ./chunks # Create chunks
-pdf-splitter convert ./chunks/ -o docling.json  # Convert to merged Docling JSON
-pdf-splitter validate docling.json ./chunks/    # Validate output
-pdf-splitter compare document.pdf           # Compare strategies
-pdf-splitter batch ./documents/             # Batch analyze
+# Split-Process-Merge workflow
+pdf-splitter analyze document.pdf              # 1. Analyze structure
+pdf-splitter chunk document.pdf -o ./chunks    # 2. Split into chunks
+pdf-splitter convert ./chunks/ -o output.json  # 3. Process & merge to Docling JSON
+pdf-splitter validate output.json ./chunks/    # 4. Validate merged document
 ```
 
-### CLI Options
+## CLI Reference
 
 ```bash
-# Common options:
-#   -v, --verbose       Enable INFO logging for all loggers (default: WARNING)
-
-# Chunk options:
-#   -o, --output DIR    Output directory
-#   -s, --strategy STR  Force strategy: fixed, hybrid, enhanced
-#   -w, --workers N     Parallel processes (default: 80% of CPUs)
-#   --sequential        Disable parallel writing
-#   --max-pages N       Max pages per chunk (default: 100)
-#   --min-pages N       Min pages per chunk (default: 15)
-
-# Convert options:
-#   -o, --output FILE   Output JSON (merged Docling document by default)
-#   -w, --workers N     Parallel processes (default: 80% of CPUs)
-#   --maxtasks N        Tasks per worker before restart (default: 1)
-#   --keep-parts        Output individual chunks instead of merged document
-
-# Validate options:
-#   -v, --verbose       Show per-chunk details
+pdf-splitter analyze <pdf>              # Show splitting recommendations
+pdf-splitter chunk <pdf> -o <dir>       # Split PDF into chunks
+pdf-splitter convert <dir> -o <file>    # Process chunks & merge into Docling document
+pdf-splitter validate <json> <dir>      # Validate merged doc against source chunks
+pdf-splitter compare <pdf>              # Compare all strategies
+pdf-splitter batch <dir>                # Batch analyze directory
 ```
 
-### Workflow
+### Key Options
 
-```bash
-pdf-splitter analyze document.pdf -v              # 1. Analyze
-pdf-splitter chunk document.pdf -o ./chunks       # 2. Chunk
-pdf-splitter convert ./chunks/ -o docling.json    # 3. Convert
-pdf-splitter validate docling.json ./chunks/      # 4. Validate
-```
+| Command | Option | Description |
+|---------|--------|-------------|
+| All | `-v` | Verbose logging |
+| chunk | `-s <strategy>` | Force: `fixed`, `hybrid`, `enhanced` |
+| chunk | `--max-pages N` | Max pages per chunk (default: 100) |
+| chunk | `-w N` | Worker processes |
+| convert | `--keep-parts` | Output individual chunks, not merged |
+| convert | `--maxtasks N` | Tasks per worker before restart (default: 1) |
 
-### Python API
+## Python API
 
 ```python
 from src.segmentation_enhanced import smart_split, smart_split_to_files
 from src.processor import BatchProcessor
+from src.reassembly import merge_from_results
 
-# Analyze
+# 1. Analyze
 result = smart_split("document.pdf", max_chunk_pages=100)
 print(result.summary())
 
-# Create chunks
+# 2. Split
 chunk_paths, result = smart_split_to_files("document.pdf", output_dir="./chunks")
 
-# Convert with Docling
-processor = BatchProcessor(max_workers=4, verbose=True)
+# 3. Process & Merge
+processor = BatchProcessor(max_workers=4)
 results = processor.execute_parallel(chunk_paths)
+merged_doc = merge_from_results(results)  # Returns unified DoclingDocument
+
+# 4. Export
+merged_doc.export_to_json("output.json")
 ```
 
 ## Strategies
@@ -94,13 +85,23 @@ results = processor.execute_parallel(chunk_paths)
 
 `smart_split()` auto-selects the best strategy.
 
-## Tests
+## Development
 
 ```bash
-pytest tests/ -v
+make help          # Show all commands
+make install-dev   # Install dev dependencies
+make lint          # Run ruff linter
+make format        # Run ruff formatter
+make test          # Run tests with coverage
+make test-fast     # Run tests without coverage
+make coverage      # Generate HTML coverage report
+make quality       # Run lint + typecheck + test
+make pre-commit    # Install git hooks
+make clean         # Remove build artifacts
 ```
 
 ## Requirements
 
 - Python 3.10+
-- docling, pypdf
+- Dependencies: docling, pypdf
+- Dev: pytest, pytest-cov, ruff, mypy, pre-commit
