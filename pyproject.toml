@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pdf-splitter"
-version = "0.2.0"
+version = "0.3.0"
 description = "A scalable PDF splitting framework for parallel document processing using Docling"
 readme = "README.md"
 license = "MIT"

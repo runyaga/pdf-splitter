@@ -23,11 +23,12 @@ python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 ## Usage
 
 ```bash
-pdf-splitter analyze document.pdf      # Analyze structure
-pdf-splitter chunk document.pdf -o ./chunks  # Create chunks
-pdf-splitter convert ./chunks/ -o out.json   # Convert to JSON
-pdf-splitter compare document.pdf      # Compare strategies
-pdf-splitter batch ./documents/        # Batch analyze
+pdf-splitter analyze document.pdf           # Analyze structure
+pdf-splitter chunk document.pdf -o ./chunks # Create chunks
+pdf-splitter convert ./chunks/ -o docling.json  # Convert to JSON
+pdf-splitter validate docling.json ./chunks/    # Validate output
+pdf-splitter compare document.pdf           # Compare strategies
+pdf-splitter batch ./documents/             # Batch analyze
 ```
 
 ### CLI Options
@@ -48,19 +49,18 @@ pdf-splitter batch ./documents/        # Batch analyze
 #   -o, --output FILE   Output JSON file
 #   -w, --workers N     Parallel processes (default: 80% of CPUs)
 #   --maxtasks N        Tasks per worker before restart (default: 1)
+
+# Validate options:
+#   -v, --verbose       Show per-chunk details
 ```
 
 ### Workflow
 
 ```bash
-# 1. Analyze structure
-pdf-splitter analyze document.pdf -v
-
-# 2. Create chunks
-pdf-splitter chunk document.pdf -o ./chunks --max-pages 50
-
-# 3. Convert to structured JSON (includes images)
-pdf-splitter convert ./chunks/ -o results.json
+pdf-splitter analyze document.pdf -v              # 1. Analyze
+pdf-splitter chunk document.pdf -o ./chunks       # 2. Chunk
+pdf-splitter convert ./chunks/ -o docling.json    # 3. Convert
+pdf-splitter validate docling.json ./chunks/      # 4. Validate
 ```
 
 ### Python API

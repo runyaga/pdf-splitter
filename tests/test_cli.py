@@ -237,6 +237,160 @@ class TestCLIConvert:
                     assert len(data) == 3
 
 
+class TestCLIValidate:
+    """Tests for validate CLI command."""
+
+    @pytest.fixture
+    def valid_docling_output(self):
+        """Create a valid Docling output JSON and matching chunks."""
+        from pypdf import PdfWriter
+        import json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            chunks_dir = tmpdir / "chunks"
+            chunks_dir.mkdir()
+
+            # Create chunk PDFs with proper naming
+            for i in range(2):
+                start_page = i * 10 + 1
+                end_page = (i + 1) * 10
+                pdf_path = chunks_dir / f"chunk_{i:04d}_pages_{start_page:04d}_{end_page:04d}.pdf"
+                writer = PdfWriter()
+                for _ in range(10):
+                    writer.add_blank_page(width=612, height=792)
+                with open(pdf_path, 'wb') as f:
+                    writer.write(f)
+
+            # Create matching Docling JSON
+            docling_data = []
+            for i in range(2):
+                start_page = i * 10 + 1
+                end_page = (i + 1) * 10
+                docling_data.append({
+                    'chunk_path': str(chunks_dir / f"chunk_{i:04d}_pages_{start_page:04d}_{end_page:04d}.pdf"),
+                    'success': True,
+                    'document_dict': {
+                        'texts': [{'prov': [{'page_no': p}]} for p in range(1, 11)],
+                        'tables': [],
+                        'pictures': []
+                    }
+                })
+
+            json_path = tmpdir / "docling.json"
+            with open(json_path, 'w') as f:
+                json.dump(docling_data, f)
+
+            yield json_path, chunks_dir
+
+    def test_validate_command_success(self, valid_docling_output):
+        """Test validate command with valid output."""
+        from src.cli import cmd_validate
+        from argparse import Namespace
+
+        json_path, chunks_dir = valid_docling_output
+
+        args = Namespace(
+            json=str(json_path),
+            chunks=str(chunks_dir),
+            verbose=False
+        )
+
+        result = cmd_validate(args)
+        assert result == 0
+
+    def test_validate_command_verbose(self, valid_docling_output):
+        """Test validate command with verbose flag."""
+        from src.cli import cmd_validate
+        from argparse import Namespace
+
+        json_path, chunks_dir = valid_docling_output
+
+        args = Namespace(
+            json=str(json_path),
+            chunks=str(chunks_dir),
+            verbose=True
+        )
+
+        result = cmd_validate(args)
+        assert result == 0
+
+    def test_validate_command_json_not_found(self):
+        """Test validate command with non-existent JSON."""
+        from src.cli import cmd_validate
+        from argparse import Namespace
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = Namespace(
+                json="nonexistent.json",
+                chunks=tmpdir,
+                verbose=False
+            )
+
+            result = cmd_validate(args)
+            assert result == 1
+
+    def test_validate_command_chunks_not_found(self):
+        """Test validate command with non-existent chunks dir."""
+        from src.cli import cmd_validate
+        from argparse import Namespace
+        import json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_path = Path(tmpdir) / "test.json"
+            with open(json_path, 'w') as f:
+                json.dump([], f)
+
+            args = Namespace(
+                json=str(json_path),
+                chunks="nonexistent_dir",
+                verbose=False
+            )
+
+            result = cmd_validate(args)
+            assert result == 1
+
+    def test_validate_command_failed_chunks(self):
+        """Test validate command with failed chunks in output."""
+        from src.cli import cmd_validate
+        from argparse import Namespace
+        from pypdf import PdfWriter
+        import json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            chunks_dir = tmpdir / "chunks"
+            chunks_dir.mkdir()
+
+            # Create one chunk
+            pdf_path = chunks_dir / "chunk_0000_pages_0001_0010.pdf"
+            writer = PdfWriter()
+            for _ in range(10):
+                writer.add_blank_page(width=612, height=792)
+            with open(pdf_path, 'wb') as f:
+                writer.write(f)
+
+            # Create Docling JSON with failure
+            docling_data = [{
+                'chunk_path': str(pdf_path),
+                'success': False,
+                'error': 'Test error'
+            }]
+
+            json_path = tmpdir / "docling.json"
+            with open(json_path, 'w') as f:
+                json.dump(docling_data, f)
+
+            args = Namespace(
+                json=str(json_path),
+                chunks=str(chunks_dir),
+                verbose=False
+            )
+
+            result = cmd_validate(args)
+            assert result == 1
+
+
 class TestCLIMain:
     """Tests for main CLI entry point."""
 
@@ -271,6 +425,15 @@ class TestCLIMain:
         from src.cli import main
 
         with patch.object(sys, 'argv', ['pdf-splitter', 'convert', '--help']):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
+
+    def test_main_validate_help(self):
+        """Test validate --help."""
+        from src.cli import main
+
+        with patch.object(sys, 'argv', ['pdf-splitter', 'validate', '--help']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0

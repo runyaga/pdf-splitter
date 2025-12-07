@@ -250,6 +250,11 @@ def _write_single_chunk(
     Returns:
         Tuple of (idx, chunk_path_str or None, error_message or None)
     """
+    # Disable GC in worker to prevent GC thrashing on large PDFs.
+    # The process exits after this function returns anyway.
+    import gc
+    gc.disable()
+
     try:
         reader = PdfReader(reader_path)
         writer = PdfWriter()
@@ -350,9 +355,6 @@ def _write_chunks_parallel(
     Uses processes instead of threads because pypdf is pure Python and
     CPU-bound. The GIL would serialize thread execution, making ThreadPoolExecutor
     ineffective. ProcessPoolExecutor bypasses the GIL for true parallelism.
-
-    Note: Unlike the Docling convert command, we don't need max_tasks_per_child
-    since pypdf doesn't have memory leaks.
     """
     logger.info(
         f"Parallel chunk writing: {max_workers} processes"
@@ -366,7 +368,8 @@ def _write_chunks_parallel(
     pdf_path_str = str(pdf_path)
     output_dir_str = str(output_dir)
 
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    executor = ProcessPoolExecutor(max_workers=max_workers)
+    try:
         # Submit all chunk writes
         futures = {}
         for idx, (start, end) in enumerate(boundaries):
@@ -395,6 +398,12 @@ def _write_chunks_parallel(
                 chunk_path = Path(chunk_path_str)
                 chunk_paths[idx] = chunk_path
                 logger.info(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
+
+        # Clear futures to release references before shutdown
+        futures.clear()
+    finally:
+        # Shutdown without waiting - workers completed, let OS clean up
+        executor.shutdown(wait=False, cancel_futures=True)
 
     # Filter out any failed chunks
     valid_paths = [p for p in chunk_paths if p is not None]

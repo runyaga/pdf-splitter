@@ -319,6 +319,62 @@ def cmd_batch(args):
     return 0
 
 
+def cmd_validate(args):
+    """Validate Docling output against source chunks."""
+    from src.validation import run_validation
+
+    json_path = Path(args.json)
+    chunks_dir = Path(args.chunks)
+
+    if not json_path.exists():
+        print(f"Error: JSON file not found: {json_path}", file=sys.stderr)
+        return 1
+
+    if not chunks_dir.is_dir():
+        print(f"Error: Chunks directory not found: {chunks_dir}", file=sys.stderr)
+        return 1
+
+    success, stats = run_validation(json_path, chunks_dir, verbose=args.verbose)
+
+    if args.verbose:
+        print(f"{'='*70}")
+        print("VALIDATION RESULTS")
+        print(f"{'='*70}")
+        print(f"JSON: {json_path}")
+        print(f"Chunks: {chunks_dir}")
+        print(f"{'-'*70}")
+
+        for v in stats['validations']:
+            status = "OK" if v['valid'] else "FAIL"
+            pages_str = ""
+            if 'original_pages' in v and v['original_pages'][0] is not None:
+                pages_str = f" (p{v['original_pages'][0]}-{v['original_pages'][1]})"
+            coverage_str = f" {v['coverage_pct']:.0f}%" if 'coverage_pct' in v else ""
+            content_str = f" [t:{v['num_texts']}, tbl:{v['num_tables']}, pic:{v['num_pictures']}]" if 'num_texts' in v else ""
+
+            print(f"[{status:4}] {v['chunk']}{pages_str}{coverage_str}{content_str}")
+            for issue in v.get('issues', []):
+                print(f"       - {issue}")
+
+        if stats['global_issues']:
+            print(f"{'-'*70}")
+            for issue in stats['global_issues']:
+                print(f"- {issue}")
+
+        print(f"{'-'*70}")
+
+    # Summary
+    print(f"Chunks: {stats['valid_chunks']}/{stats['total_chunks']} valid | "
+          f"Elements: {stats['total_texts']} texts, {stats['total_tables']} tables, {stats['total_pictures']} pictures")
+
+    if success:
+        print("PASSED")
+        return 0
+    else:
+        print("FAILED")
+        return 1
+
+
 def _add_common_options(parser):
     """Add common splitting options to a parser."""
     parser.add_argument("--max-pages", type=int, default=100,
@@ -367,6 +423,9 @@ Examples:
 
   Batch analyze:
     pdf-splitter batch ./documents/
+
+  Validate output:
+    pdf-splitter validate results.json ./chunks/
 """
     )
 
@@ -417,6 +476,14 @@ Examples:
     p_batch.add_argument("input_dir", help="Directory containing PDFs")
     _add_common_options(p_batch)
     p_batch.set_defaults(func=cmd_batch)
+
+    # validate command
+    p_validate = subparsers.add_parser("validate", help="Validate Docling output against chunks")
+    p_validate.add_argument("json", help="Path to Docling output JSON file")
+    p_validate.add_argument("chunks", help="Path to chunks directory")
+    p_validate.add_argument("-v", "--verbose", action="store_true",
+                            help="Show per-chunk details")
+    p_validate.set_defaults(func=cmd_validate)
 
     args = parser.parse_args()
 
