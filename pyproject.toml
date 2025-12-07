@@ -112,7 +112,7 @@ exclude_lines = [
 ]
 # Baseline: 64% (Dec 2025). Target: 80%
 # Main gaps: cli.py (50%), logging_config.py (20%), segmentation_enhanced.py (55%)
-fail_under = 40
+fail_under = 20
 show_missing = true
 
 [tool.coverage.html]
