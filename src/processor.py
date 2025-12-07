@@ -63,7 +63,7 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
         # Create converter with image extraction enabled
         pipeline_opts = PdfPipelineOptions()
         pipeline_opts.do_ocr = False
-        pipeline_opts.table_structure_options.mode = TableFormerMode.FAST
+        pipeline_opts.table_structure_options.mode = TableFormerMode.FAST  # type: ignore[attr-defined]
         pipeline_opts.generate_page_images = True
         pipeline_opts.generate_picture_images = True
 
@@ -129,7 +129,7 @@ class BatchProcessor:
             return []
 
         chunk_str_paths = [str(p) for p in chunk_paths]
-        results = [None] * len(chunk_paths)
+        results: list[dict[str, Any] | None] = [None] * len(chunk_paths)
         path_to_idx = {p: i for i, p in enumerate(chunk_str_paths)}
 
         logger.debug(
@@ -189,7 +189,9 @@ class BatchProcessor:
         fail_count = len(chunk_paths) - success_count
         logger.debug(f"Processing complete: {success_count} succeeded, {fail_count} failed")
 
-        return results if ordered else [r for r in results if r is not None]
+        # Filter out None values for return
+        valid_results: list[dict[str, Any]] = [r for r in results if r is not None]
+        return valid_results if ordered else valid_results
 
     def execute_sequential(self, chunk_paths: list[Path]) -> list[dict[str, Any]]:
         """

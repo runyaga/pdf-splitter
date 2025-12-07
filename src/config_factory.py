@@ -33,7 +33,7 @@ def create_converter() -> DocumentConverter:
     """
     pipeline_opts = PdfPipelineOptions()
     pipeline_opts.do_ocr = False
-    pipeline_opts.table_structure_options.mode = TableFormerMode.FAST
+    pipeline_opts.table_structure_options.mode = TableFormerMode.FAST  # type: ignore[attr-defined]
     pipeline_opts.generate_page_images = False
     pipeline_opts.generate_picture_images = False
 
@@ -57,7 +57,7 @@ def get_pipeline_options() -> PdfPipelineOptions:
     """
     opts = PdfPipelineOptions()
     opts.do_ocr = False
-    opts.table_structure_options.mode = TableFormerMode.FAST
+    opts.table_structure_options.mode = TableFormerMode.FAST  # type: ignore[attr-defined]
     opts.generate_page_images = False
     opts.generate_picture_images = False
     return opts

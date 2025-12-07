@@ -183,7 +183,7 @@ def _auto_select_strategy(
         return _get_fixed_boundaries(total_pages, max_chunk_pages, overlap), "fixed_no_bookmarks"
 
     # Analyze bookmark structure
-    all_bookmarks = []
+    all_bookmarks: list[tuple[int, int, str]] = []
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
     logger.debug(f"Found {len(all_bookmarks)} bookmarks")
 
@@ -358,7 +358,7 @@ def _write_chunks_parallel(
     """
     logger.debug(f"Parallel chunk writing: {max_workers} processes, {total_chunks} chunks")
 
-    chunk_paths = [None] * total_chunks
+    chunk_paths: list[Path | None] = [None] * total_chunks
     completed_count = 0
 
     # Convert to strings for cross-process pickling
@@ -385,7 +385,7 @@ def _write_chunks_parallel(
 
             if error:
                 logger.error(f"Failed to write chunk {idx + 1}: {error}")
-            else:
+            elif chunk_path_str is not None:
                 chunk_path = Path(chunk_path_str)
                 chunk_paths[idx] = chunk_path
                 logger.debug(f"Wrote {completed_count}/{total_chunks}: {chunk_path.name}")
@@ -512,7 +512,7 @@ def _get_deep_bookmark_boundaries(
     Finds the optimal level that provides meaningful chapter/section splits.
     """
     # Collect all bookmarks with their levels
-    all_bookmarks = []
+    all_bookmarks: list[tuple[int, int, str]] = []
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
     logger.debug(f"Deep bookmark scan: found {len(all_bookmarks)} total bookmarks")
 
@@ -595,7 +595,7 @@ def _find_optimal_level(by_level: dict[int, list[int]], total_pages: int) -> int
     - Prefers chapter-level splits over section-level
     """
     best_level = -1
-    best_score = -1
+    best_score: float = -1.0
 
     for level, pages in by_level.items():
         unique_pages = sorted(set(pages))
@@ -707,7 +707,7 @@ def analyze_document_structure(pdf_path: Path) -> dict[str, Any]:
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)
 
-    analysis = {
+    analysis: dict[str, Any] = {
         "filename": pdf_path.name,
         "total_pages": total_pages,
         "has_outline": bool(reader.outline),
@@ -721,7 +721,7 @@ def analyze_document_structure(pdf_path: Path) -> dict[str, Any]:
         return analysis
 
     # Collect all bookmarks
-    all_bookmarks = []
+    all_bookmarks: list[tuple[int, int, str]] = []
     _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
 
     # Analyze by level
@@ -792,7 +792,7 @@ def get_split_boundaries_hybrid(
         return [(0, total_pages)], "single_chunk"
 
     # Collect all bookmarks
-    all_bookmarks = []
+    all_bookmarks: list[tuple[int, int, str]] = []
     if reader.outline:
         _collect_bookmarks_recursive(reader, reader.outline, all_bookmarks, level=0)
     logger.debug(f"Collected {len(all_bookmarks)} bookmarks for hybrid analysis")
@@ -897,18 +897,19 @@ def _merge_and_split_boundaries(
     boundaries: list[tuple[int, int]], max_pages: int, min_pages: int, overlap: int
 ) -> list[tuple[int, int]]:
     """Merge small boundaries and split large ones."""
-    result = []
-    accumulated_start = None
-    accumulated_end = None
+    result: list[tuple[int, int]] = []
+    accumulated_start: int | None = None
+    accumulated_end: int | None = None
 
     for start, end in boundaries:
         size = end - start
 
         if size > max_pages:
             # Flush accumulated
-            if accumulated_start is not None:
+            if accumulated_start is not None and accumulated_end is not None:
                 result.append((accumulated_start, accumulated_end))
                 accumulated_start = None
+                accumulated_end = None
 
             # Split large chunk
             sub = _get_fixed_boundaries(size, max_pages, overlap)
@@ -922,19 +923,22 @@ def _merge_and_split_boundaries(
             accumulated_end = end
 
             # Flush if accumulated enough
-            if accumulated_end - accumulated_start >= min_pages:
-                result.append((accumulated_start, accumulated_end))
-                accumulated_start = None
+            if accumulated_end is not None and accumulated_start is not None:
+                if accumulated_end - accumulated_start >= min_pages:
+                    result.append((accumulated_start, accumulated_end))
+                    accumulated_start = None
+                    accumulated_end = None
         else:
             # Flush accumulated
-            if accumulated_start is not None:
+            if accumulated_start is not None and accumulated_end is not None:
                 result.append((accumulated_start, accumulated_end))
                 accumulated_start = None
+                accumulated_end = None
 
             result.append((start, end))
 
     # Final flush
-    if accumulated_start is not None:
+    if accumulated_start is not None and accumulated_end is not None:
         result.append((accumulated_start, accumulated_end))
 
     return result

@@ -35,10 +35,12 @@ def validate_chunk(chunk_result: dict, chunks_dir: Path) -> dict[str, Any]:
 
     chunk_idx, start_page, end_page = parse_chunk_filename(chunk_name)
 
-    if chunk_idx is None:
+    if chunk_idx is None or start_page is None or end_page is None:
         issues.append(f"Could not parse chunk filename: {chunk_name}")
         return {"chunk": chunk_name, "valid": False, "issues": issues}
 
+    # Assert for mypy type narrowing (values are guaranteed non-None after above check)
+    assert start_page is not None and end_page is not None
     chunk_page_count = end_page - start_page + 1
 
     chunk_file = chunks_dir / chunk_name

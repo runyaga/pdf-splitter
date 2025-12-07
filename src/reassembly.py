@@ -405,7 +405,7 @@ def get_merge_statistics(doc: DoclingDocument) -> dict[str, Any]:
     Returns:
         Dict with statistics about the document structure
     """
-    stats = {
+    stats: dict[str, Any] = {
         "total_items": 0,
         "tables": 0,
         "text_items": 0,
@@ -413,6 +413,7 @@ def get_merge_statistics(doc: DoclingDocument) -> dict[str, Any]:
         "unique_pages": set(),
         "page_range": (None, None),
     }
+    unique_pages: set[int] = set()
 
     try:
         for item, _level in doc.iterate_items():
@@ -431,12 +432,12 @@ def get_merge_statistics(doc: DoclingDocument) -> dict[str, Any]:
             if hasattr(item, "prov") and item.prov:
                 for prov in item.prov:
                     if hasattr(prov, "page_no") and prov.page_no is not None:
-                        stats["unique_pages"].add(prov.page_no)
+                        unique_pages.add(prov.page_no)
 
         # Calculate page range
-        if stats["unique_pages"]:
-            stats["page_range"] = (min(stats["unique_pages"]), max(stats["unique_pages"]))
-            stats["unique_pages"] = len(stats["unique_pages"])
+        if unique_pages:
+            stats["page_range"] = (min(unique_pages), max(unique_pages))
+            stats["unique_pages"] = len(unique_pages)
         else:
             stats["unique_pages"] = 0
 
