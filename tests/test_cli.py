@@ -9,8 +9,8 @@ import tempfile
 import sys
 
 
-class TestCLISplit:
-    """Tests for split CLI command."""
+class TestCLIChunk:
+    """Tests for chunk CLI command."""
 
     @pytest.fixture
     def test_pdf(self):
@@ -27,9 +27,9 @@ class TestCLISplit:
         yield pdf_path
         pdf_path.unlink(missing_ok=True)
 
-    def test_split_command_parallel_default(self, test_pdf):
-        """Test split command uses parallel by default."""
-        from src.cli import cmd_split
+    def test_chunk_command_parallel_default(self, test_pdf):
+        """Test chunk command uses parallel by default."""
+        from src.cli import cmd_chunk
         from argparse import Namespace
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -45,16 +45,16 @@ class TestCLISplit:
                 verbose=False
             )
 
-            result = cmd_split(args)
+            result = cmd_chunk(args)
             assert result == 0
 
             # Check chunks were created
             chunks = list(Path(tmpdir).glob("*.pdf"))
             assert len(chunks) >= 2
 
-    def test_split_command_sequential_flag(self, test_pdf):
-        """Test split command with --sequential flag."""
-        from src.cli import cmd_split
+    def test_chunk_command_sequential_flag(self, test_pdf):
+        """Test chunk command with --sequential flag."""
+        from src.cli import cmd_chunk
         from argparse import Namespace
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -70,15 +70,15 @@ class TestCLISplit:
                 verbose=False
             )
 
-            result = cmd_split(args)
+            result = cmd_chunk(args)
             assert result == 0
 
             chunks = list(Path(tmpdir).glob("*.pdf"))
             assert len(chunks) >= 2
 
-    def test_split_command_custom_workers(self, test_pdf):
-        """Test split command with custom workers."""
-        from src.cli import cmd_split
+    def test_chunk_command_custom_workers(self, test_pdf):
+        """Test chunk command with custom workers."""
+        from src.cli import cmd_chunk
         from argparse import Namespace
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -94,12 +94,12 @@ class TestCLISplit:
                 verbose=False
             )
 
-            result = cmd_split(args)
+            result = cmd_chunk(args)
             assert result == 0
 
-    def test_split_command_file_not_found(self):
-        """Test split command with non-existent file."""
-        from src.cli import cmd_split
+    def test_chunk_command_file_not_found(self):
+        """Test chunk command with non-existent file."""
+        from src.cli import cmd_chunk
         from argparse import Namespace
 
         args = Namespace(
@@ -114,12 +114,12 @@ class TestCLISplit:
             verbose=False
         )
 
-        result = cmd_split(args)
+        result = cmd_chunk(args)
         assert result == 1
 
 
-class TestCLIProcess:
-    """Tests for process CLI command."""
+class TestCLIConvert:
+    """Tests for convert CLI command."""
 
     @pytest.fixture
     def chunk_dir(self):
@@ -140,9 +140,9 @@ class TestCLIProcess:
 
             yield tmpdir
 
-    def test_process_command_basic(self, chunk_dir):
-        """Test process command on directory of chunks."""
-        from src.cli import cmd_process
+    def test_convert_command_basic(self, chunk_dir):
+        """Test convert command on directory of chunks."""
+        from src.cli import cmd_convert
         from argparse import Namespace
 
         args = Namespace(
@@ -163,12 +163,12 @@ class TestCLIProcess:
             ]
             MockBatchProcessor.return_value = mock_instance
 
-            result = cmd_process(args)
+            result = cmd_convert(args)
             assert result == 0
 
-    def test_process_command_not_found(self):
-        """Test process command with non-existent path."""
-        from src.cli import cmd_process
+    def test_convert_command_not_found(self):
+        """Test convert command with non-existent path."""
+        from src.cli import cmd_convert
         from argparse import Namespace
 
         args = Namespace(
@@ -179,12 +179,12 @@ class TestCLIProcess:
             verbose=False
         )
 
-        result = cmd_process(args)
+        result = cmd_convert(args)
         assert result == 1
 
-    def test_process_command_empty_dir(self):
-        """Test process command with empty directory."""
-        from src.cli import cmd_process
+    def test_convert_command_empty_dir(self):
+        """Test convert command with empty directory."""
+        from src.cli import cmd_convert
         from argparse import Namespace
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -196,12 +196,12 @@ class TestCLIProcess:
                 verbose=False
             )
 
-            result = cmd_process(args)
+            result = cmd_convert(args)
             assert result == 1
 
-    def test_process_command_with_output(self, chunk_dir):
-        """Test process command writes output JSON."""
-        from src.cli import cmd_process
+    def test_convert_command_with_output(self, chunk_dir):
+        """Test convert command writes output JSON."""
+        from src.cli import cmd_convert
         from argparse import Namespace
         import json
 
@@ -226,7 +226,7 @@ class TestCLIProcess:
                 ]
                 MockBatchProcessor.return_value = mock_instance
 
-                result = cmd_process(args)
+                result = cmd_convert(args)
                 assert result == 0
                 assert output_path.exists()
 
@@ -257,20 +257,20 @@ class TestCLIMain:
                 main()
             assert exc_info.value.code == 0
 
-    def test_main_split_help(self):
-        """Test split --help."""
+    def test_main_chunk_help(self):
+        """Test chunk --help."""
         from src.cli import main
 
-        with patch.object(sys, 'argv', ['pdf-splitter', 'split', '--help']):
+        with patch.object(sys, 'argv', ['pdf-splitter', 'chunk', '--help']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0
 
-    def test_main_process_help(self):
-        """Test process --help."""
+    def test_main_convert_help(self):
+        """Test convert --help."""
         from src.cli import main
 
-        with patch.object(sys, 'argv', ['pdf-splitter', 'process', '--help']):
+        with patch.object(sys, 'argv', ['pdf-splitter', 'convert', '--help']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 0

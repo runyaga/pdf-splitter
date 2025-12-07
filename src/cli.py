@@ -75,8 +75,8 @@ def cmd_analyze(args):
     return 0
 
 
-def cmd_split(args):
-    """Split a PDF into chunks."""
+def cmd_chunk(args):
+    """Split a PDF into PDF chunk files."""
     from src.segmentation_enhanced import smart_split_to_files
 
     pdf_path = Path(args.pdf)
@@ -136,8 +136,8 @@ def cmd_split(args):
     return 0
 
 
-def cmd_process(args):
-    """Process PDF chunks with Docling in parallel."""
+def cmd_convert(args):
+    """Convert PDF chunks to structured documents using Docling."""
     from src.processor import BatchProcessor
 
     # Gather chunk files
@@ -154,7 +154,7 @@ def cmd_process(args):
         return 1
 
     print(f"{'='*70}")
-    print(f"DOCLING PARALLEL PROCESSING")
+    print(f"DOCLING CONVERSION")
     print(f"{'='*70}")
     print(f"Input: {input_path}")
     print(f"Chunks to process: {len(chunk_paths)}")
@@ -344,15 +344,15 @@ Examples:
     pdf-splitter analyze document.pdf
     pdf-splitter analyze document.pdf --verbose
 
-  Split a PDF (parallel writing by default):
-    pdf-splitter split document.pdf --output ./chunks
-    pdf-splitter split document.pdf --max-pages 50 --workers 8
-    pdf-splitter split document.pdf --sequential  # disable parallel
+  Create PDF chunks (parallel writing by default):
+    pdf-splitter chunk document.pdf --output ./chunks
+    pdf-splitter chunk document.pdf --max-pages 50 --workers 8
+    pdf-splitter chunk document.pdf --sequential  # disable parallel
 
-  Process chunks with Docling (parallel):
-    pdf-splitter process ./chunks/
-    pdf-splitter process ./chunks/ --workers 4 --output results.json
-    pdf-splitter process ./chunks/ --maxtasks 2 -v
+  Convert chunks to structured documents (parallel Docling):
+    pdf-splitter convert ./chunks/
+    pdf-splitter convert ./chunks/ --workers 4 --output results.json
+    pdf-splitter convert ./chunks/ --maxtasks 2 -v
 
   Compare strategies:
     pdf-splitter compare document.pdf
@@ -362,6 +362,9 @@ Examples:
 """
     )
 
+    from src import __version__
+    parser.add_argument("-V", "--version", action="version", version=f"pdf-splitter {__version__}")
+
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # analyze command
@@ -370,30 +373,30 @@ Examples:
     _add_common_options(p_analyze)
     p_analyze.set_defaults(func=cmd_analyze)
 
-    # split command
-    p_split = subparsers.add_parser("split", help="Split PDF into chunks")
-    p_split.add_argument("pdf", help="Path to PDF file")
-    p_split.add_argument("-o", "--output", help="Output directory")
-    p_split.add_argument("-s", "--strategy", choices=["fixed", "hybrid", "enhanced"],
+    # chunk command
+    p_chunk = subparsers.add_parser("chunk", help="Create PDF chunk files from a large PDF")
+    p_chunk.add_argument("pdf", help="Path to PDF file")
+    p_chunk.add_argument("-o", "--output", help="Output directory")
+    p_chunk.add_argument("-s", "--strategy", choices=["fixed", "hybrid", "enhanced"],
                          help="Force specific strategy")
-    p_split.add_argument("-w", "--workers", type=int, default=None,
+    p_chunk.add_argument("-w", "--workers", type=int, default=None,
                          help="Number of parallel workers for writing (default: CPU count)")
-    p_split.add_argument("--sequential", action="store_true",
+    p_chunk.add_argument("--sequential", action="store_true",
                          help="Disable parallel writing (use sequential mode)")
-    _add_common_options(p_split)
-    p_split.set_defaults(func=cmd_split)
+    _add_common_options(p_chunk)
+    p_chunk.set_defaults(func=cmd_chunk)
 
-    # process command
-    p_process = subparsers.add_parser("process", help="Process chunks with Docling in parallel")
-    p_process.add_argument("input", help="Path to chunk PDF or directory of chunks")
-    p_process.add_argument("-o", "--output", help="Output JSON file for results")
-    p_process.add_argument("-w", "--workers", type=int, default=None,
+    # convert command
+    p_convert = subparsers.add_parser("convert", help="Convert PDF chunks to structured documents using Docling")
+    p_convert.add_argument("input", help="Path to chunk PDF or directory of chunks")
+    p_convert.add_argument("-o", "--output", help="Output JSON file for results")
+    p_convert.add_argument("-w", "--workers", type=int, default=None,
                            help="Number of parallel workers (default: CPU count)")
-    p_process.add_argument("--maxtasks", type=int, default=1,
+    p_convert.add_argument("--maxtasks", type=int, default=1,
                            help="Tasks per worker before restart (default: 1 for memory isolation)")
-    p_process.add_argument("-v", "--verbose", action="store_true",
+    p_convert.add_argument("-v", "--verbose", action="store_true",
                            help="Verbose output")
-    p_process.set_defaults(func=cmd_process)
+    p_convert.set_defaults(func=cmd_convert)
 
     # compare command
     p_compare = subparsers.add_parser("compare", help="Compare splitting strategies")

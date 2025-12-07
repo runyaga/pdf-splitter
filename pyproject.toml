@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "runyaga" }
+    { name = "PDF Splitter Contributors" }
 ]
 keywords = ["pdf", "docling", "document-processing", "parallel-processing"]
 classifiers = [
@@ -43,9 +43,9 @@ profiling = [
 pdf-splitter = "src.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/runyaga/pdf-splitter"
-Documentation = "https://github.com/runyaga/pdf-splitter#readme"
-Repository = "https://github.com/runyaga/pdf-splitter"
+Homepage = "https://github.com/pdf-splitter/pdf-splitter"
+Documentation = "https://github.com/pdf-splitter/pdf-splitter#readme"
+Repository = "https://github.com/pdf-splitter/pdf-splitter"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

@@ -47,13 +47,13 @@ pip install -r requirements.txt
 # Analyze a PDF's structure
 pdf-splitter analyze document.pdf
 
-# Split a PDF into chunks (parallel by default)
-pdf-splitter split document.pdf --output ./chunks
-pdf-splitter split document.pdf --workers 8 --output ./chunks
+# Create PDF chunks (parallel by default)
+pdf-splitter chunk document.pdf --output ./chunks
+pdf-splitter chunk document.pdf --workers 8 --output ./chunks
 
-# Process chunks with Docling (parallel)
-pdf-splitter process ./chunks/
-pdf-splitter process ./chunks/ --workers 4 --output results.json
+# Convert chunks to structured documents (parallel Docling)
+pdf-splitter convert ./chunks/
+pdf-splitter convert ./chunks/ --workers 4 --output results.json
 
 # Compare all splitting strategies
 pdf-splitter compare document.pdf
@@ -65,7 +65,7 @@ pdf-splitter batch ./documents/
 ### CLI Options
 
 ```bash
-# Split options:
+# Chunk options:
 #   -o, --output DIR    Output directory
 #   -s, --strategy STR  Force strategy: fixed, hybrid, enhanced
 #   -w, --workers N     Parallel write workers (default: CPU count)
@@ -75,12 +75,38 @@ pdf-splitter batch ./documents/
 #   --overlap N         Overlap pages between chunks (default: 0)
 #   -v, --verbose       Show [BEGIN]/[COMPLETE] lifecycle per chunk
 
-# Process options:
+# Convert options:
 #   -o, --output FILE   Output JSON file for Docling results
 #   -w, --workers N     Parallel Docling workers (default: CPU count)
 #   --maxtasks N        Tasks per worker before restart (default: 1)
-#   -v, --verbose       Show processing details
+#   -v, --verbose       Show conversion details
 ```
+
+### When to Use Each Command
+
+| Command | Use Case | Example |
+|---------|----------|---------|
+| `analyze` | Understand a PDF's structure before splitting | You have a 1000-page manual and want to see how it's organized (bookmarks, chapters) before deciding on chunk sizes |
+| `chunk` | Create smaller PDF files from a large document | You need to break a 500-page PDF into 50-page chunks for parallel processing or to stay within API limits |
+| `convert` | Extract structured content (text, tables) from PDFs | You have PDF chunks and need to extract their content as structured data for an LLM pipeline or search index |
+| `compare` | Evaluate different splitting strategies | You're unsure whether bookmark-based or fixed-size splitting works better for your document type |
+| `batch` | Analyze multiple PDFs at once | You have a directory of PDFs and want a quick overview of how each would be split |
+
+**Typical Workflow:**
+```bash
+# 1. Analyze the document structure
+pdf-splitter analyze large_manual.pdf --verbose
+
+# 2. Create chunks (uses ThreadPoolExecutor - single process, multiple threads)
+pdf-splitter chunk large_manual.pdf --output ./chunks --max-pages 50
+
+# 3. Convert chunks to structured documents (uses ProcessPoolExecutor - multiple processes)
+pdf-splitter convert ./chunks/ --output results.json --workers 8
+```
+
+**Why Two Separate Commands?**
+- `chunk` uses **threads** for fast I/O-bound PDF writing (single Python process)
+- `convert` uses **processes** for CPU-bound Docling extraction (multiple Python processes with memory isolation)
 
 ### Python API
 
@@ -88,7 +114,7 @@ pdf-splitter batch ./documents/
 from src.segmentation_enhanced import smart_split, smart_split_to_files
 from src.processor import BatchProcessor
 
-# Analyze and get split boundaries
+# Analyze and get chunk boundaries
 result = smart_split("document.pdf", max_chunk_pages=100)
 print(result.summary())
 # Strategy: auto_hybrid_chapter_l4
@@ -96,7 +122,7 @@ print(result.summary())
 # Chunks: 20
 # Chunk sizes: 10-101 pages (avg 49.8)
 
-# Split to files (parallel by default)
+# Create chunk files (parallel by default)
 chunk_paths, result = smart_split_to_files(
     "document.pdf",
     output_dir="./chunks",
@@ -105,7 +131,7 @@ chunk_paths, result = smart_split_to_files(
     parallel=True         # set False for sequential
 )
 
-# Process chunks with Docling (parallel)
+# Convert chunks with Docling (parallel)
 processor = BatchProcessor(max_workers=4, maxtasksperchild=1)
 results = processor.execute_parallel(chunk_paths)
 ```
