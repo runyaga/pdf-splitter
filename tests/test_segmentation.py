@@ -17,9 +17,9 @@ class TestGetSplitBoundaries:
 
     def test_empty_pdf_returns_empty_list(self):
         """Test that empty PDF returns empty boundary list."""
-        from src.segmentation import get_split_boundaries
+        from pdf_splitter.segmentation import get_split_boundaries
 
-        with patch("src.segmentation.PdfReader") as mock_reader_class:
+        with patch("pdf_splitter.segmentation.PdfReader") as mock_reader_class:
             mock_reader = MagicMock()
             mock_reader.pages = []
             mock_reader_class.return_value = mock_reader
@@ -29,9 +29,9 @@ class TestGetSplitBoundaries:
 
     def test_single_page_pdf(self):
         """Test that single page PDF returns single boundary."""
-        from src.segmentation import get_split_boundaries
+        from pdf_splitter.segmentation import get_split_boundaries
 
-        with patch("src.segmentation.PdfReader") as mock_reader_class:
+        with patch("pdf_splitter.segmentation.PdfReader") as mock_reader_class:
             mock_reader = MagicMock()
             mock_reader.pages = [MagicMock()]  # 1 page
             mock_reader.outline = []
@@ -46,7 +46,7 @@ class TestFixedBoundaries:
 
     def test_fixed_boundaries_basic(self):
         """Test basic fixed boundary generation."""
-        from src.segmentation import _get_fixed_boundaries
+        from pdf_splitter.segmentation import _get_fixed_boundaries
 
         # 100 pages, chunk_size=50, overlap=5
         boundaries = _get_fixed_boundaries(100, 50, 5)
@@ -59,21 +59,21 @@ class TestFixedBoundaries:
 
     def test_fixed_boundaries_no_overlap(self):
         """Test fixed boundaries without overlap."""
-        from src.segmentation import _get_fixed_boundaries
+        from pdf_splitter.segmentation import _get_fixed_boundaries
 
         boundaries = _get_fixed_boundaries(100, 50, 0)
         assert boundaries == [(0, 50), (50, 100)]
 
     def test_fixed_boundaries_small_pdf(self):
         """Test boundaries for PDF smaller than chunk size."""
-        from src.segmentation import _get_fixed_boundaries
+        from pdf_splitter.segmentation import _get_fixed_boundaries
 
         boundaries = _get_fixed_boundaries(30, 50, 5)
         assert boundaries == [(0, 30)]
 
     def test_fixed_boundaries_exact_chunk_size(self):
         """Test when total pages is exact multiple of chunk size."""
-        from src.segmentation import _get_fixed_boundaries
+        from pdf_splitter.segmentation import _get_fixed_boundaries
 
         boundaries = _get_fixed_boundaries(100, 25, 5)
         # Should cover: (0,25), (20,45), (40,65), (60,85), (80,100)
@@ -87,28 +87,28 @@ class TestPageCoverage:
 
     def test_page_coverage_complete(self):
         """Test that page coverage detects complete coverage."""
-        from src.segmentation import get_page_coverage
+        from pdf_splitter.segmentation import get_page_coverage
 
         boundaries = [(0, 50), (45, 100)]
         assert get_page_coverage(boundaries, 100) is True
 
     def test_page_coverage_with_gap(self):
         """Test that page coverage detects gaps."""
-        from src.segmentation import get_page_coverage
+        from pdf_splitter.segmentation import get_page_coverage
 
         boundaries = [(0, 40), (50, 100)]  # Gap at 40-49
         assert get_page_coverage(boundaries, 100) is False
 
     def test_page_coverage_missing_end(self):
         """Test that page coverage detects missing end pages."""
-        from src.segmentation import get_page_coverage
+        from pdf_splitter.segmentation import get_page_coverage
 
         boundaries = [(0, 50), (45, 90)]  # Missing 90-99
         assert get_page_coverage(boundaries, 100) is False
 
     def test_page_coverage_empty(self):
         """Test empty boundaries for empty document."""
-        from src.segmentation import get_page_coverage
+        from pdf_splitter.segmentation import get_page_coverage
 
         assert get_page_coverage([], 0) is True
         assert get_page_coverage([], 10) is False
@@ -119,7 +119,7 @@ class TestBookmarkBoundaries:
 
     def test_bookmark_boundaries_extraction(self):
         """Test extraction of boundaries from bookmarks."""
-        from src.segmentation import _get_bookmark_boundaries
+        from pdf_splitter.segmentation import _get_bookmark_boundaries
 
         mock_reader = MagicMock()
         mock_reader.outline = [
@@ -139,7 +139,7 @@ class TestBookmarkBoundaries:
 
     def test_bookmark_boundaries_empty_outline(self):
         """Test fallback when no bookmarks exist."""
-        from src.segmentation import _get_bookmark_boundaries
+        from pdf_splitter.segmentation import _get_bookmark_boundaries
 
         mock_reader = MagicMock()
         mock_reader.outline = []
@@ -149,7 +149,7 @@ class TestBookmarkBoundaries:
 
     def test_bookmark_boundaries_none_outline(self):
         """Test fallback when outline is None."""
-        from src.segmentation import _get_bookmark_boundaries
+        from pdf_splitter.segmentation import _get_bookmark_boundaries
 
         mock_reader = MagicMock()
         mock_reader.outline = None
@@ -182,7 +182,7 @@ class TestSplitPdf:
 
     def test_split_pdf_creates_chunks(self, sample_pdf):
         """Test that split_pdf creates chunk files."""
-        from src.segmentation import split_pdf
+        from pdf_splitter.segmentation import split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -197,7 +197,7 @@ class TestSplitPdf:
         """Test that split preserves all pages."""
         from pypdf import PdfReader
 
-        from src.segmentation import get_page_coverage, get_split_boundaries
+        from pdf_splitter.segmentation import get_page_coverage, get_split_boundaries
 
         boundaries = get_split_boundaries(sample_pdf, chunk_size=3, overlap=1)
         total_pages = len(PdfReader(str(sample_pdf)).pages)

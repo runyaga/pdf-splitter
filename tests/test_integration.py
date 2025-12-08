@@ -61,8 +61,8 @@ class TestMemoryLeakRegression:
 
         Success Condition: RAM usage remains below 2GB throughout processing.
         """
-        from src.processor import BatchProcessor
-        from src.segmentation import split_pdf
+        from pdf_splitter.processor import BatchProcessor
+        from pdf_splitter.segmentation import split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Split into small chunks
@@ -97,7 +97,7 @@ class TestSemanticContinuity:
         """
         from pypdf import PdfReader
 
-        from src.segmentation import get_page_coverage, get_split_boundaries
+        from pdf_splitter.segmentation import get_page_coverage, get_split_boundaries
 
         reader = PdfReader(str(sample_pdf))
         total_pages = len(reader.pages)
@@ -117,9 +117,9 @@ class TestSemanticContinuity:
                 next_start = boundaries[i + 1][0]
 
                 # With overlap, next chunk should start before current ends
-                assert next_start < current_end or next_start == current_end, (
-                    f"Chunks {i} and {i + 1} should have overlap or be contiguous"
-                )
+                assert (
+                    next_start < current_end or next_start == current_end
+                ), f"Chunks {i} and {i + 1} should have overlap or be contiguous"
 
 
 @pytest.mark.integration
@@ -136,7 +136,7 @@ class TestTableStructureIntegrity:
 
         Success Condition: table.export_to_dataframe() returns valid DataFrame.
         """
-        from src.config_factory import create_converter
+        from pdf_splitter.config_factory import create_converter
 
         try:
             converter = create_converter()
@@ -179,9 +179,9 @@ class TestProvenanceMonotonicity:
         Success Condition: Page number sequence never resets (no 1,2,1,2 pattern).
         Fail Condition: Sequence resets indicate concatenation failure.
         """
-        from src.processor import BatchProcessor
-        from src.reassembly import merge_from_results, validate_provenance_monotonicity
-        from src.segmentation import split_pdf
+        from pdf_splitter.processor import BatchProcessor
+        from pdf_splitter.reassembly import merge_from_results, validate_provenance_monotonicity
+        from pdf_splitter.segmentation import split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunks = split_pdf(sample_pdf, Path(tmpdir), chunk_size=10, overlap=2)
@@ -225,9 +225,9 @@ class TestEndToEndPipeline:
         """
         from pypdf import PdfReader
 
-        from src.processor import BatchProcessor
-        from src.reassembly import get_merge_statistics, merge_from_results
-        from src.segmentation import get_page_coverage, get_split_boundaries, split_pdf
+        from pdf_splitter.processor import BatchProcessor
+        from pdf_splitter.reassembly import get_merge_statistics, merge_from_results
+        from pdf_splitter.segmentation import get_page_coverage, get_split_boundaries, split_pdf
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -261,9 +261,9 @@ class TestEndToEndPipeline:
                     print(f"Merge statistics: {stats}")
 
                     # V-04: Check page coverage in provenance
-                    assert stats["unique_pages"] > 0 or stats["total_items"] == 0, (
-                        "V-04: Processed document should have page provenance"
-                    )
+                    assert (
+                        stats["unique_pages"] > 0 or stats["total_items"] == 0
+                    ), "V-04: Processed document should have page provenance"
 
 
 @pytest.mark.integration
@@ -275,7 +275,7 @@ class TestVerificationChecklist:
     def test_v01_backend_configuration(self):
         """V-01: Verify V2 Backend is active and maxtasksperchild=1."""
 
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         # Check processor configuration
         processor = BatchProcessor()
@@ -292,7 +292,7 @@ class TestVerificationChecklist:
         """
         import time
 
-        from src.config_factory import create_converter
+        from pdf_splitter.config_factory import create_converter
 
         start_time = time.time()
         converter = create_converter()

@@ -15,23 +15,23 @@ class TestMergeDocuments:
 
     def test_merge_empty_list_returns_none(self):
         """Test that empty list returns None."""
-        from src.reassembly import merge_documents
+        from pdf_splitter.reassembly import merge_documents
 
         result = merge_documents([])
         assert result is None
 
     def test_merge_single_document_returns_same(self):
         """Test that single document is returned as-is."""
-        from src.reassembly import merge_documents
+        from pdf_splitter.reassembly import merge_documents
 
         mock_doc = MagicMock()
         result = merge_documents([mock_doc])
         assert result is mock_doc
 
-    @patch("src.reassembly.DoclingDocument")
+    @patch("pdf_splitter.reassembly.DoclingDocument")
     def test_merge_multiple_documents_uses_custom_concat(self, mock_doc_class):
         """Test that merge uses custom concatenation for multiple documents."""
-        from src.reassembly import merge_documents
+        from pdf_splitter.reassembly import merge_documents
 
         # Create minimal valid document dicts
         doc1 = MagicMock()
@@ -63,10 +63,10 @@ class TestMergeDocuments:
         mock_doc_class.model_validate.assert_called_once()
         assert result is mock_merged
 
-    @patch("src.reassembly.DoclingDocument")
+    @patch("pdf_splitter.reassembly.DoclingDocument")
     def test_merge_handles_validation_error(self, mock_doc_class):
         """Test that merge raises on validation failure."""
-        from src.reassembly import merge_documents
+        from pdf_splitter.reassembly import merge_documents
 
         doc1 = MagicMock()
         doc2 = MagicMock()
@@ -93,10 +93,10 @@ class TestMergeDocuments:
 class TestMergeFromResults:
     """Tests for merge_from_results function."""
 
-    @patch("src.reassembly.DoclingDocument")
+    @patch("pdf_splitter.reassembly.DoclingDocument")
     def test_merge_from_results_skips_failed(self, mock_doc_class):
         """Test that failed results are skipped."""
-        from src.reassembly import merge_from_results
+        from pdf_splitter.reassembly import merge_from_results
 
         results = [
             {"success": False, "error": "Failed", "document_dict": None},
@@ -111,10 +111,10 @@ class TestMergeFromResults:
         # Should only process successful result
         mock_doc_class.model_validate.assert_called_once_with({"test": "data"})
 
-    @patch("src.reassembly.DoclingDocument")
+    @patch("pdf_splitter.reassembly.DoclingDocument")
     def test_merge_from_results_all_failed_returns_none(self, mock_doc_class):
         """Test that all-failed results returns None."""
-        from src.reassembly import merge_from_results
+        from pdf_splitter.reassembly import merge_from_results
 
         results = [
             {"success": False, "error": "Failed 1", "document_dict": None},
@@ -130,7 +130,7 @@ class TestProvenanceMonotonicity:
 
     def test_monotonicity_empty_pages(self):
         """Test that empty page list is valid."""
-        from src.reassembly import validate_provenance_monotonicity
+        from pdf_splitter.reassembly import validate_provenance_monotonicity
 
         mock_doc = MagicMock()
         mock_doc.iterate_items.return_value = []
@@ -139,7 +139,7 @@ class TestProvenanceMonotonicity:
 
     def test_monotonicity_increasing_valid(self):
         """Test that increasing page numbers are valid."""
-        from src.reassembly import validate_provenance_monotonicity
+        from pdf_splitter.reassembly import validate_provenance_monotonicity
 
         # Create mock items with monotonic page numbers
         mock_items = []
@@ -157,7 +157,7 @@ class TestProvenanceMonotonicity:
 
     def test_monotonicity_reset_invalid(self):
         """Test that page number reset (1,2,1,2) is invalid."""
-        from src.reassembly import validate_provenance_monotonicity
+        from pdf_splitter.reassembly import validate_provenance_monotonicity
 
         # Create mock items with resetting page numbers
         mock_items = []
@@ -179,7 +179,7 @@ class TestExtractProvenancePages:
 
     def test_extract_pages_from_items(self):
         """Test extraction of page numbers from document items."""
-        from src.reassembly import extract_provenance_pages
+        from pdf_splitter.reassembly import extract_provenance_pages
 
         mock_items = []
         for page in [1, 2, 2, 3]:
@@ -197,7 +197,7 @@ class TestExtractProvenancePages:
 
     def test_extract_pages_handles_missing_prov(self):
         """Test handling of items without provenance."""
-        from src.reassembly import extract_provenance_pages
+        from pdf_splitter.reassembly import extract_provenance_pages
 
         item_with_prov = MagicMock()
         prov = MagicMock()
@@ -222,7 +222,7 @@ class TestGetMergeStatistics:
 
     def test_statistics_empty_document(self):
         """Test statistics for empty document."""
-        from src.reassembly import get_merge_statistics
+        from pdf_splitter.reassembly import get_merge_statistics
 
         mock_doc = MagicMock()
         mock_doc.iterate_items.return_value = []
@@ -236,7 +236,7 @@ class TestGetMergeStatistics:
 
     def test_statistics_counts_item_types(self):
         """Test that statistics correctly count item types."""
-        from src.reassembly import get_merge_statistics
+        from pdf_splitter.reassembly import get_merge_statistics
 
         # Create mock items of different types
         table_item = MagicMock()
