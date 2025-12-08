@@ -62,8 +62,8 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
     try:
         # Create converter with image extraction enabled
         pipeline_opts = PdfPipelineOptions()
-        pipeline_opts.do_ocr = False
-        pipeline_opts.table_structure_options.mode = TableFormerMode.FAST  # type: ignore[attr-defined]
+        pipeline_opts.do_ocr = True
+        pipeline_opts.table_structure_options.mode = TableFormerMode.ACCURATE  # type: ignore[attr-defined]
         pipeline_opts.generate_page_images = True
         pipeline_opts.generate_picture_images = True
 
