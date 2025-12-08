@@ -52,7 +52,7 @@ jobs:
           allow-prereleases: true
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync  --locked
 
       - name: Run tests with coverage
         run: uv run pytest --cov=src --cov-report=xml --cov-report=term-missing tests/
