@@ -18,7 +18,7 @@ class TestBatchProcessor:
         """Test default worker count uses 80% of CPU count."""
         import os
 
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         processor = BatchProcessor()
         expected_workers = max(1, int((os.cpu_count() or 4) * 0.8))
@@ -27,7 +27,7 @@ class TestBatchProcessor:
 
     def test_init_custom_workers(self):
         """Test custom worker configuration."""
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         processor = BatchProcessor(max_workers=4, maxtasksperchild=2)
         assert processor.max_workers == 4
@@ -35,17 +35,17 @@ class TestBatchProcessor:
 
     def test_execute_parallel_empty_list(self):
         """Test that empty chunk list returns empty results."""
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         processor = BatchProcessor()
         results = processor.execute_parallel([])
         assert results == []
 
     # TODO: Fix mock - ProcessPoolExecutor context manager mocking needs work
-    # @patch('src.processor.ProcessPoolExecutor')
+    # @patch('pdf_splitter.processor.ProcessPoolExecutor')
     # def test_execute_parallel_uses_maxtasksperchild(self, mock_executor_class):
     #     """Test that ProcessPoolExecutor is configured with maxtasksperchild."""
-    #     from src.processor import BatchProcessor
+    #     from pdf_splitter.processor import BatchProcessor
     #
     #     mock_executor = MagicMock()
     #     mock_executor.__enter__ = MagicMock(return_value=mock_executor)
@@ -79,7 +79,7 @@ class TestWorkerFunction:
         """Verify that imports happen inside worker (inspection test)."""
         import inspect
 
-        from src.processor import _process_chunk
+        from pdf_splitter.processor import _process_chunk
 
         source = inspect.getsource(_process_chunk)
 
@@ -90,10 +90,10 @@ class TestWorkerFunction:
     # TODO: Can't patch imports inside worker function - they're imported at runtime
     # def test_process_chunk_returns_correct_structure(self):
     #     """Test that _process_chunk returns expected dict structure."""
-    #     from src.processor import _process_chunk
+    #     from pdf_splitter.processor import _process_chunk
     #
     #     # Create a mock to avoid actual processing
-    #     with patch('src.processor.DocumentConverter') as mock_converter:
+    #     with patch('pdf_splitter.processor.DocumentConverter') as mock_converter:
     #         mock_doc = MagicMock()
     #         mock_doc.export_to_dict.return_value = {'test': 'data'}
     #
@@ -136,7 +136,7 @@ class TestProcessorIntegration:
     @pytest.mark.integration
     def test_execute_sequential_processes_chunk(self, sample_pdf_chunk):
         """Test sequential processing of a chunk."""
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         processor = BatchProcessor()
         results = processor.execute_sequential([sample_pdf_chunk])
@@ -151,7 +151,7 @@ class TestProcessorIntegration:
     @pytest.mark.integration
     def test_execute_parallel_processes_chunks(self, sample_pdf_chunk):
         """Test parallel processing of chunks."""
-        from src.processor import BatchProcessor
+        from pdf_splitter.processor import BatchProcessor
 
         processor = BatchProcessor(max_workers=2)
         results = processor.execute_parallel([sample_pdf_chunk])

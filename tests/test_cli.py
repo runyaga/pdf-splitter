@@ -32,7 +32,7 @@ class TestCLIChunk:
         """Test chunk command uses parallel by default."""
         from argparse import Namespace
 
-        from src.cli import cmd_chunk
+        from pdf_splitter.cli import cmd_chunk
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = Namespace(
@@ -58,7 +58,7 @@ class TestCLIChunk:
         """Test chunk command with --sequential flag."""
         from argparse import Namespace
 
-        from src.cli import cmd_chunk
+        from pdf_splitter.cli import cmd_chunk
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = Namespace(
@@ -83,7 +83,7 @@ class TestCLIChunk:
         """Test chunk command with custom workers."""
         from argparse import Namespace
 
-        from src.cli import cmd_chunk
+        from pdf_splitter.cli import cmd_chunk
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = Namespace(
@@ -105,7 +105,7 @@ class TestCLIChunk:
         """Test chunk command with non-existent file."""
         from argparse import Namespace
 
-        from src.cli import cmd_chunk
+        from pdf_splitter.cli import cmd_chunk
 
         args = Namespace(
             pdf="nonexistent.pdf",
@@ -149,7 +149,7 @@ class TestCLIConvert:
         """Test convert command on directory of chunks."""
         from argparse import Namespace
 
-        from src.cli import cmd_convert
+        from pdf_splitter.cli import cmd_convert
 
         args = Namespace(
             input=str(chunk_dir),
@@ -161,7 +161,7 @@ class TestCLIConvert:
         )
 
         # Mock the entire BatchProcessor to avoid pickling issues
-        with patch("src.processor.BatchProcessor") as MockBatchProcessor:
+        with patch("pdf_splitter.processor.BatchProcessor") as MockBatchProcessor:
             mock_instance = MagicMock()
             mock_instance.execute_parallel.return_value = [
                 {
@@ -192,7 +192,7 @@ class TestCLIConvert:
         """Test convert command with non-existent path."""
         from argparse import Namespace
 
-        from src.cli import cmd_convert
+        from pdf_splitter.cli import cmd_convert
 
         args = Namespace(
             input="nonexistent_dir",
@@ -210,7 +210,7 @@ class TestCLIConvert:
         """Test convert command with empty directory."""
         from argparse import Namespace
 
-        from src.cli import cmd_convert
+        from pdf_splitter.cli import cmd_convert
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = Namespace(
@@ -225,7 +225,7 @@ class TestCLIConvert:
         import json
         from argparse import Namespace
 
-        from src.cli import cmd_convert
+        from pdf_splitter.cli import cmd_convert
 
         with tempfile.TemporaryDirectory() as out_dir:
             output_path = Path(out_dir) / "results.json"
@@ -240,7 +240,7 @@ class TestCLIConvert:
             )
 
             # Mock the entire BatchProcessor to avoid pickling issues
-            with patch("src.processor.BatchProcessor") as MockBatchProcessor:
+            with patch("pdf_splitter.processor.BatchProcessor") as MockBatchProcessor:
                 mock_instance = MagicMock()
                 mock_instance.execute_parallel.return_value = [
                     {
@@ -330,7 +330,7 @@ class TestCLIValidate:
         """Test validate command with valid output."""
         from argparse import Namespace
 
-        from src.cli import cmd_validate
+        from pdf_splitter.cli import cmd_validate
 
         json_path, chunks_dir = valid_docling_output
 
@@ -343,7 +343,7 @@ class TestCLIValidate:
         """Test validate command with verbose flag."""
         from argparse import Namespace
 
-        from src.cli import cmd_validate
+        from pdf_splitter.cli import cmd_validate
 
         json_path, chunks_dir = valid_docling_output
 
@@ -356,7 +356,7 @@ class TestCLIValidate:
         """Test validate command with non-existent JSON."""
         from argparse import Namespace
 
-        from src.cli import cmd_validate
+        from pdf_splitter.cli import cmd_validate
 
         with tempfile.TemporaryDirectory() as tmpdir:
             args = Namespace(json="nonexistent.json", chunks=tmpdir, verbose=False)
@@ -369,7 +369,7 @@ class TestCLIValidate:
         import json
         from argparse import Namespace
 
-        from src.cli import cmd_validate
+        from pdf_splitter.cli import cmd_validate
 
         with tempfile.TemporaryDirectory() as tmpdir:
             json_path = Path(tmpdir) / "test.json"
@@ -388,7 +388,7 @@ class TestCLIValidate:
 
         from pypdf import PdfWriter
 
-        from src.cli import cmd_validate
+        from pdf_splitter.cli import cmd_validate
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -421,7 +421,7 @@ class TestCLIMain:
 
     def test_main_no_command(self):
         """Test main with no command shows help."""
-        from src.cli import main
+        from pdf_splitter.cli import main
 
         with patch.object(sys, "argv", ["pdf-splitter"]):
             result = main()
@@ -429,7 +429,7 @@ class TestCLIMain:
 
     def test_main_help(self):
         """Test --help flag."""
-        from src.cli import main
+        from pdf_splitter.cli import main
 
         with patch.object(sys, "argv", ["pdf-splitter", "--help"]):
             with pytest.raises(SystemExit) as exc_info:
@@ -438,7 +438,7 @@ class TestCLIMain:
 
     def test_main_chunk_help(self):
         """Test chunk --help."""
-        from src.cli import main
+        from pdf_splitter.cli import main
 
         with patch.object(sys, "argv", ["pdf-splitter", "chunk", "--help"]):
             with pytest.raises(SystemExit) as exc_info:
@@ -447,7 +447,7 @@ class TestCLIMain:
 
     def test_main_convert_help(self):
         """Test convert --help."""
-        from src.cli import main
+        from pdf_splitter.cli import main
 
         with patch.object(sys, "argv", ["pdf-splitter", "convert", "--help"]):
             with pytest.raises(SystemExit) as exc_info:
@@ -456,7 +456,7 @@ class TestCLIMain:
 
     def test_main_validate_help(self):
         """Test validate --help."""
-        from src.cli import main
+        from pdf_splitter.cli import main
 
         with patch.object(sys, "argv", ["pdf-splitter", "validate", "--help"]):
             with pytest.raises(SystemExit) as exc_info:

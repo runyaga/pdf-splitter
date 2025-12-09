@@ -57,9 +57,9 @@ pdf-splitter validate out.json ./chunks   # validate output
 ## Python API
 
 ```python
-from src.segmentation_enhanced import smart_split_to_files
-from src.processor import BatchProcessor
-from src.reassembly import merge_from_results
+from pdf_splitter.segmentation_enhanced import smart_split_to_files
+from pdf_splitter.processor import BatchProcessor
+from pdf_splitter.reassembly import merge_from_results
 
 chunks, _ = smart_split_to_files("doc.pdf", output_dir="./chunks")
 results = BatchProcessor(max_workers=4).execute_parallel(chunks)

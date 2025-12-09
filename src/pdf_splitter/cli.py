@@ -5,9 +5,9 @@ PDF Splitter CLI
 Command-line interface for smart PDF splitting.
 
 Usage:
-    python -m src.cli analyze <pdf_path>
-    python -m src.cli split <pdf_path> [--output <dir>] [--max-pages <n>]
-    python -m src.cli compare <pdf_path>
+    python -m pdf_splitter.cli analyze <pdf_path>
+    python -m pdf_splitter.cli split <pdf_path> [--output <dir>] [--max-pages <n>]
+    python -m pdf_splitter.cli compare <pdf_path>
 """
 
 import argparse
@@ -15,12 +15,12 @@ import os
 import sys
 from pathlib import Path
 
-from src.logging_config import setup_logging
+from pdf_splitter.logging_config import setup_logging
 
 
 def cmd_analyze(args):
     """Analyze a PDF and show splitting recommendations."""
-    from src.segmentation_enhanced import analyze_document_structure, smart_split
+    from pdf_splitter.segmentation_enhanced import analyze_document_structure, smart_split
 
     pdf_path = Path(args.pdf)
     if not pdf_path.exists():
@@ -77,7 +77,7 @@ def cmd_analyze(args):
 
 def cmd_chunk(args):
     """Split a PDF into PDF chunk files."""
-    from src.segmentation_enhanced import smart_split_to_files
+    from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
     pdf_path = Path(args.pdf)
     if not pdf_path.exists():
@@ -139,8 +139,8 @@ def cmd_chunk(args):
 
 def cmd_convert(args):
     """Convert PDF chunks to structured documents using Docling."""
-    from src.processor import BatchProcessor
-    from src.reassembly import merge_from_results
+    from pdf_splitter.processor import BatchProcessor
+    from pdf_splitter.reassembly import merge_from_results
 
     # Gather chunk files
     input_path = Path(args.input)
@@ -254,8 +254,8 @@ def cmd_compare(args):
     """Compare all splitting strategies on a PDF."""
     from pypdf import PdfReader
 
-    from src.segmentation import get_split_boundaries
-    from src.segmentation_enhanced import (
+    from pdf_splitter.segmentation import get_split_boundaries
+    from pdf_splitter.segmentation_enhanced import (
         get_split_boundaries_enhanced,
         get_split_boundaries_hybrid,
         smart_split,
@@ -318,7 +318,7 @@ def cmd_compare(args):
 
 def cmd_batch(args):
     """Process all PDFs in a directory."""
-    from src.segmentation_enhanced import smart_split
+    from pdf_splitter.segmentation_enhanced import smart_split
 
     input_dir = Path(args.input_dir)
     if not input_dir.is_dir():
@@ -356,7 +356,7 @@ def cmd_batch(args):
 
 def cmd_validate(args):
     """Validate Docling output against source chunks."""
-    from src.validation import run_validation
+    from pdf_splitter.validation import run_validation
 
     json_path = Path(args.json)
     chunks_dir = Path(args.chunks)
@@ -474,7 +474,7 @@ Examples:
 """,
     )
 
-    from src import __version__
+    from . import __version__
 
     parser.add_argument("-V", "--version", action="version", version=f"pdf-splitter {__version__}")
 

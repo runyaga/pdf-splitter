@@ -15,7 +15,7 @@ class TestConfigFactory:
 
     def test_pipeline_options_ocr_disabled(self):
         """Test that OCR is disabled in pipeline options."""
-        from src.config_factory import get_pipeline_options
+        from pdf_splitter.config_factory import get_pipeline_options
 
         opts = get_pipeline_options()
         assert opts.do_ocr is False, "OCR should be disabled for digital-native PDFs"
@@ -24,27 +24,27 @@ class TestConfigFactory:
         """Test that table mode is set to FAST."""
         from docling.datamodel.pipeline_options import TableFormerMode
 
-        from src.config_factory import get_pipeline_options
+        from pdf_splitter.config_factory import get_pipeline_options
 
         opts = get_pipeline_options()
-        assert opts.table_structure_options.mode == TableFormerMode.FAST, (
-            "Table mode should be FAST for 2x speedup"
-        )
+        assert (
+            opts.table_structure_options.mode == TableFormerMode.FAST
+        ), "Table mode should be FAST for 2x speedup"
 
     def test_pipeline_options_images_disabled(self):
         """Test that image generation is disabled to prevent OOM."""
-        from src.config_factory import get_pipeline_options
+        from pdf_splitter.config_factory import get_pipeline_options
 
         opts = get_pipeline_options()
         assert opts.generate_page_images is False, "Page image generation should be disabled"
         assert opts.generate_picture_images is False, "Picture image generation should be disabled"
 
-    @patch("src.config_factory.DocumentConverter")
+    @patch("pdf_splitter.config_factory.DocumentConverter")
     def test_create_converter_uses_v2_backend(self, mock_converter_class):
         """Test that create_converter uses DoclingParseV2DocumentBackend."""
         from docling.datamodel.base_models import InputFormat
 
-        from src.config_factory import create_converter
+        from pdf_splitter.config_factory import create_converter
 
         create_converter()
 
@@ -62,17 +62,17 @@ class TestConfigFactory:
         pdf_option = format_options[InputFormat.PDF]
         from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
 
-        assert pdf_option.backend == DoclingParseV2DocumentBackend, (
-            "Should use V2 backend for 10x faster loading"
-        )
+        assert (
+            pdf_option.backend == DoclingParseV2DocumentBackend
+        ), "Should use V2 backend for 10x faster loading"
 
-    @patch("src.config_factory.DocumentConverter")
+    @patch("pdf_splitter.config_factory.DocumentConverter")
     def test_create_converter_pipeline_options(self, mock_converter_class):
         """Test that converter is created with correct pipeline options."""
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import TableFormerMode
 
-        from src.config_factory import create_converter
+        from pdf_splitter.config_factory import create_converter
 
         create_converter()
 
@@ -94,7 +94,7 @@ class TestConfigFactoryIntegration:
         """Test that create_converter returns a valid DocumentConverter."""
         from docling.document_converter import DocumentConverter
 
-        from src.config_factory import create_converter
+        from pdf_splitter.config_factory import create_converter
 
         converter = create_converter()
         assert isinstance(converter, DocumentConverter)
