@@ -11,6 +11,7 @@ in the correct process space.
 
 import logging
 import os
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,8 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
     # mid-conversion and gets stuck traversing the massive object graph.
     # With maxtasksperchild=1, the process dies after one chunk anyway,
     # so letting the OS reclaim memory is faster than Python GC.
+    start = time.time()
+
     import gc
 
     gc.disable()
@@ -53,6 +56,7 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
     for logger_name in ["docling", "docling_core", "docling_parse", "src"]:
         logging.getLogger(logger_name).setLevel(level)
 
+    logger.info(f"start processing chunk {chunk_path} pid={os.getpid()}")
     # Import inside worker to ensure proper process isolation
     from docling.backend.docling_parse_v2_backend import DoclingParseV2DocumentBackend
     from docling.datamodel.base_models import InputFormat
@@ -81,11 +85,27 @@ def _process_chunk(chunk_path: str, verbose: bool = False) -> dict[str, Any]:
 
         # Serialize document for cross-process transfer
         doc_json = doc.export_to_dict()
-
-        return {"success": True, "chunk_path": chunk_path, "document_dict": doc_json, "error": None}
+        proc_time = time.time() - start
+        logger.info(
+            f"end processing chunk {chunk_path} in {proc_time:.2f} seconds pid={os.getpid()}"
+        )
+        return {
+            "success": True,
+            "chunk_path": chunk_path,
+            "document_dict": doc_json,
+            "error": None,
+            "proc_time": proc_time,
+        }
 
     except Exception as e:
-        return {"success": False, "chunk_path": chunk_path, "document_dict": None, "error": str(e)}
+        proc_time = time.time() - start
+        return {
+            "success": False,
+            "chunk_path": chunk_path,
+            "document_dict": None,
+            "error": str(e),
+            "proc_time": proc_time,
+        }
 
 
 class BatchProcessor:
