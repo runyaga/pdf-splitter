@@ -15,7 +15,7 @@ jobs:
       - name: ruff check
         uses: astral-sh/ruff-action@v3
         with:
-             src: "./src"
+          cache: true
 
   test:
     name: Test (Python ${{ matrix.python-version }})
