@@ -2,7 +2,7 @@
 Centralized logging configuration for PDF Splitter.
 
 Usage:
-    from src.logging_config import setup_logging, get_logger
+    from pdf_splitter.logging_config import setup_logging, get_logger
 
     # In CLI entry point:
     setup_logging(verbose=True)

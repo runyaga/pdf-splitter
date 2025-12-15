@@ -1,6 +1,7 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"
+
 
 [project]
 name = "pdf-splitter"
@@ -29,20 +30,13 @@ dependencies = [
     "pypdf>=4.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-mock>=3.12.0",
-    "pytest-cov>=6.0.0",
-    "mypy>=1.13.0",
-    "pre-commit>=4.0.0",
-]
+
 profiling = [
     "memory-profiler>=0.61.0",
 ]
 
 [project.scripts]
-pdf-splitter = "src.cli:main"
+pdf-splitter = "pdf_splitter.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/pdf-splitter/pdf-splitter"
@@ -50,7 +44,7 @@ Documentation = "https://github.com/pdf-splitter/pdf-splitter#readme"
 Repository = "https://github.com/pdf-splitter/pdf-splitter"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["pdf_splitter"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -100,7 +94,7 @@ line-ending = "auto"
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src"]
+source = ["pdf_splitter"]
 branch = true
 omit = ["*/tests/*", "*/__init__.py"]
 
@@ -125,3 +119,13 @@ warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
 exclude = ["tests/", "build/", "lib/"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+    "ruff>=0.14.9",
+]

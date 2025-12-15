@@ -13,7 +13,7 @@ class TestSplitResult:
 
     def test_split_result_creation(self):
         """Test SplitResult can be created with all fields."""
-        from src.segmentation_enhanced import SplitResult
+        from pdf_splitter.segmentation_enhanced import SplitResult
 
         result = SplitResult(
             boundaries=[(0, 50), (45, 100)],
@@ -32,7 +32,7 @@ class TestSplitResult:
 
     def test_split_result_summary(self):
         """Test SplitResult summary method."""
-        from src.segmentation_enhanced import SplitResult
+        from pdf_splitter.segmentation_enhanced import SplitResult
 
         result = SplitResult(
             boundaries=[(0, 100)],
@@ -100,7 +100,7 @@ class TestSmartSplit:
 
     def test_small_pdf_single_chunk(self, small_pdf):
         """Test that small PDFs return single chunk."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(small_pdf, max_chunk_pages=100)
 
@@ -110,7 +110,7 @@ class TestSmartSplit:
 
     def test_medium_pdf_fixed_small(self, medium_pdf):
         """Test that medium PDFs use fixed_small strategy."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(medium_pdf, max_chunk_pages=100)
 
@@ -120,7 +120,7 @@ class TestSmartSplit:
 
     def test_large_pdf_creates_multiple_chunks(self, large_pdf):
         """Test that large PDFs create multiple balanced chunks."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(large_pdf, max_chunk_pages=100)
 
@@ -130,7 +130,7 @@ class TestSmartSplit:
 
     def test_force_strategy_fixed(self, large_pdf):
         """Test forcing fixed strategy."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(large_pdf, max_chunk_pages=100, force_strategy="fixed")
 
@@ -139,14 +139,14 @@ class TestSmartSplit:
 
     def test_invalid_force_strategy_raises(self, small_pdf):
         """Test that invalid strategy raises ValueError."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         with pytest.raises(ValueError, match="Unknown strategy"):
             smart_split(small_pdf, force_strategy="invalid_strategy")
 
     def test_invalid_max_chunk_pages_raises(self, small_pdf):
         """Test that max_chunk_pages < 1 raises ValueError."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         with pytest.raises(ValueError, match="max_chunk_pages must be >= 1"):
             smart_split(small_pdf, max_chunk_pages=0)
@@ -156,14 +156,14 @@ class TestSmartSplit:
 
     def test_invalid_overlap_raises(self, small_pdf):
         """Test that overlap < 0 raises ValueError."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         with pytest.raises(ValueError, match="overlap must be >= 0"):
             smart_split(small_pdf, overlap=-1)
 
     def test_boundaries_cover_all_pages(self, large_pdf):
         """Test that boundaries cover all pages."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(large_pdf, max_chunk_pages=100)
 
@@ -178,7 +178,7 @@ class TestSmartSplit:
 
     def test_overlap_detection(self, large_pdf):
         """Test overlap detection in results."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(large_pdf, max_chunk_pages=100, overlap=5)
 
@@ -188,7 +188,7 @@ class TestSmartSplit:
 
     def test_overlap_greater_than_chunk_size(self, small_pdf):
         """Test that overlap >= chunk_size doesn't break splitting."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         # overlap (5) > max_chunk_pages (2) - should still create multiple chunks
         result = smart_split(small_pdf, max_chunk_pages=2, overlap=5)
@@ -224,7 +224,7 @@ class TestSmartSplitToFiles:
 
     def test_creates_chunk_files(self, test_pdf):
         """Test that chunk files are created."""
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -239,7 +239,7 @@ class TestSmartSplitToFiles:
         """Test that chunk files contain correct number of pages."""
         from pypdf import PdfReader
 
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -262,7 +262,7 @@ class TestSmartSplitToFiles:
 
     def test_uses_temp_dir_when_no_output(self, test_pdf):
         """Test that temp directory is used when output_dir is None."""
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         chunk_paths, _result = smart_split_to_files(test_pdf, output_dir=None, max_chunk_pages=50)
 
@@ -298,7 +298,7 @@ class TestParallelChunkWriting:
         """Test that parallel and sequential produce same results."""
         from pypdf import PdfReader
 
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
             # Parallel
@@ -322,7 +322,7 @@ class TestParallelChunkWriting:
 
     def test_parallel_with_custom_workers(self, test_pdf):
         """Test parallel writing with custom worker count."""
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunk_paths, _result = smart_split_to_files(
@@ -335,7 +335,7 @@ class TestParallelChunkWriting:
 
     def test_sequential_mode_explicit(self, test_pdf):
         """Test explicit sequential mode."""
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunk_paths, _result = smart_split_to_files(
@@ -348,7 +348,7 @@ class TestParallelChunkWriting:
 
     def test_single_chunk_uses_sequential(self, test_pdf):
         """Test that single chunk doesn't use parallel (no benefit)."""
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # 100 pages, max 200 = single chunk
@@ -363,7 +363,7 @@ class TestParallelChunkWriting:
         """Test that parallel writing maintains chunk order."""
         from pypdf import PdfReader
 
-        from src.segmentation_enhanced import smart_split_to_files
+        from pdf_splitter.segmentation_enhanced import smart_split_to_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
             chunk_paths, result = smart_split_to_files(
@@ -404,7 +404,7 @@ class TestSmartSplitOnRealPDFs:
     @pytest.mark.integration
     def test_sample_pdf_splits(self, sample_pdf):
         """Test smart_split on sample PDF."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(sample_pdf, max_chunk_pages=20)
 
@@ -415,7 +415,7 @@ class TestSmartSplitOnRealPDFs:
     @pytest.mark.integration
     def test_small_chunk_size(self, sample_pdf):
         """Test splitting with small chunk size."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(sample_pdf, max_chunk_pages=10)
 
@@ -425,7 +425,7 @@ class TestSmartSplitOnRealPDFs:
     @pytest.mark.integration
     def test_large_chunk_size(self, sample_pdf):
         """Test splitting with large chunk size."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         result = smart_split(sample_pdf, max_chunk_pages=1000)
 
@@ -436,7 +436,7 @@ class TestSmartSplitOnRealPDFs:
     @pytest.mark.integration
     def test_all_pdfs_balanced(self, assets_dir):
         """Test that all PDFs get reasonably balanced splits."""
-        from src.segmentation_enhanced import smart_split
+        from pdf_splitter.segmentation_enhanced import smart_split
 
         pdfs = list(assets_dir.glob("*.pdf"))
         if not pdfs:

@@ -32,8 +32,8 @@ def create_converter() -> DocumentConverter:
         DocumentConverter: Configured converter instance
     """
     pipeline_opts = PdfPipelineOptions()
-    pipeline_opts.do_ocr = False
-    pipeline_opts.table_structure_options.mode = TableFormerMode.FAST  # type: ignore[attr-defined]
+    pipeline_opts.do_ocr = True
+    pipeline_opts.table_structure_options.mode = TableFormerMode.ACCURATE  # type: ignore[attr-defined]
     pipeline_opts.generate_page_images = False
     pipeline_opts.generate_picture_images = False
 

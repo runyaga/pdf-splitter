@@ -997,7 +997,7 @@ def get_split_boundaries_with_docling_toc(
 
     from pypdf import PdfReader, PdfWriter
 
-    from src.config_factory import create_converter
+    from pdf_splitter.config_factory import create_converter
 
     reader = PdfReader(str(pdf_path))
     total_pages = len(reader.pages)

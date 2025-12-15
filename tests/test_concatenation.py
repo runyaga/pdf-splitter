@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from src.reassembly import (
+from pdf_splitter.reassembly import (
     _offset_provenance,
     _remap_item_refs,
     _remap_ref,
@@ -193,9 +193,9 @@ class TestConcatenateDocuments:
         # Verify page range covers document
         if page_numbers:
             assert min(page_numbers) >= 1, "Page numbers should start at 1"
-            assert max(page_numbers) <= total_pages, (
-                f"Max page {max(page_numbers)} exceeds total {total_pages}"
-            )
+            assert (
+                max(page_numbers) <= total_pages
+            ), f"Max page {max(page_numbers)} exceeds total {total_pages}"
 
     def test_c04_text_count(self, chunk_dicts):
         """C-04: Total text count equals sum of chunk texts."""
